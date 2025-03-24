@@ -3,10 +3,6 @@ import scipy as scipy
 def compute_normalisation_constant_to_N(integral_result, N=1):
     """
     Compute a normalisation constant to N, default = 1
-
-    best practice:
-    firstly call integrate_XYZ below,
-    then pass the result and specify the N(atoms)
     """
     return N / integral_result
 
