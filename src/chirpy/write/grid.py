@@ -38,7 +38,7 @@ def cubeWriter(fn, comments, numbers, pos_aa, cell_vec_aa, data,
                origin_aa=[0.0, 0.0, 0.0]):
     '''Write grid/volume data into a Gaussian Cube file.
        cell_vec_aa specifies the three cell vectors A, B, C in atomic units
-       numbers is a lits or tuple of atomic numbers (or any numbers).
+       numbers is a lists or tuple of atomic numbers (or any numbers).
        Expects a single cube frame and does not support direct
        output of cube trajectories (use an iterator and append=True for this).
        '''

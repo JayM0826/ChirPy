@@ -15,10 +15,10 @@ dependencies = [
     "fortranformat>=1.2.2",
     "numpy>=1.26.1",
     "matplotlib>=3.9.0",
-    "periodictable>=1.7.0",
+    "periodictable>=1.7.0, <1.7.1",
     "pycifrw>=4.4.5",
-    "scipy>=1.13.1",
-    "tqdm>=4.66.4",
+    "scipy>=1.13.1, <1.14",
+    "tqdm>=4.66.4"
 ]
 classifiers = [
   "Programming Language :: Python"

@@ -332,7 +332,7 @@ class ITERATOR():
                           stacklevel=2)
 
     def merge(self, other, axis=-1, dim1=None, dim2=None):
-        '''Merge horizontically with another iterator (of equal length).
+        '''Merge horizontally with another iterator (of equal length).
            Specify axis 0 or 1/-1 to combine atoms or data, respectively
            (default: -1).
            Specify cartesian dimensions to be used from data by dim1/dim2
