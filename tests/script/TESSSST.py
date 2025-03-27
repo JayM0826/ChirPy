@@ -1,27 +1,54 @@
+import chirpy as cp
 import numpy as np
 
-# Create example arrays
-A = np.array([[1, 2, 3, 4],
-              [5, 6, 7, 8],
-              [9, 10, 11, 12],
-              [13, 14, 15, 16]])  # Shape: (4, 4)
+import utils as utils
+from src.chirpy.classes.volume import ScalarField
 
-B = np.array([[0],
-              [1],
-              [2],
-              [3]])  # Shape: (4, 1)
 
-# Reshape B to (4, 1, 1) for broadcasting
-B_reshaped = B[:, np.newaxis, :]  # Shape becomes (4, 1, 1)
 
-# Perform the subtraction (resulting shape will be (4, 4, 4))
-result = A - B_reshaped
+# density_data = soap_3d.example_density()
+#
+# # print(system.__dict__)
+#
+# cell_vec_aa = np.array([[2.0, 0.0, 0.0],
+#                         [0.0, 2.0, 0.0],
+#                         [0.0, 0.0, 2.0]])
+# print(70 * "*")
+# scalar_field = cp.classes.volume.ScalarField(data=density_data, cell_vec_aa=cell_vec_aa)
+# print(70 * "*")
+# scalar_field.print_info()
 
-# Show the result of A - B_reshaped
-print("A - B_reshaped = \n", result)
-print("Shape of result: ", result.shape)
-final_result = np.sum(result, axis=0)
+"""
+output:
 
-# Show the summed result
-print("Sum along axis 0: \n", final_result)
-print("Shape of final result: ", final_result.shape)
+–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+ScalarField 
+–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+
+
+–––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
+CELL  200.00000  200.00000  200.00000   90.00000   90.00000   90.00000
+CUBIC
+-----------------------------------------------------------------------------
+ A    200.00000    0.00000    0.00000
+ B      0.00000  200.00000    0.00000
+ C      0.00000    0.00000  200.00000
+ 
+"""
+
+
+system = cp.trajectory.XYZ("tartrate.xyz").expand()
+system.print_info()
+atom_positions = system.data[-1][:, 0:3]
+# density = utils.compute_whole_grid_density(atom_positions)
+distribution = utils.compute_whole_grid_distribution(system.data, )
+# utils.plot_iosfurface(xv, yv, zv, values)
+print(70 * "*")
+
+scalar_field = ScalarField(data=distribution, cell_vec_aa=np.array([[1,0,0],[0,1,0],[0,0,1]]))
+scalar_field.write("distribution.cube")
+scalar_field.print_info()
+
+
+
+

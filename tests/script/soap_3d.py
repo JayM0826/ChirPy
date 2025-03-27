@@ -8,104 +8,52 @@ Original file is located at
 """
 
 import numpy as np
-import plotly.graph_objects as go
 
 import utils as utils
 
 
-def gaussian_fun_alt_3D(sigma_3D, relative_distances_3D):
-    # NB: r must be an array
-    relative_xs = relative_distances_3D[:, 0]
-    relative_ys = relative_distances_3D[:, 1]
-    relative_zs = relative_distances_3D[:, 2]
-
-    return lambda x, y, z: np.exp(1/(-2 * sigma_3D[0]**2) * (x - relative_xs[:, np.newaxis,np.newaxis, np.newaxis]) ** 2
-                               + 1/(-2 * sigma_3D[1]**2) * (y - relative_ys[:, np.newaxis,np.newaxis, np.newaxis]) ** 2
-                               + 1/(-2 * sigma_3D[2]**2) * (z - relative_zs[:, np.newaxis,np.newaxis, np.newaxis]) ** 2)
-def trans_invariant_density_alt_3D(atom_positions, sigma_3D, r_cutoff = np.inf, origin_index = 0):
-    relative_distances_3D  = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
-    density = gaussian_fun_alt_3D(sigma_3D, relative_distances_3D)
-    return lambda z, y, x: np.sum(density(x, y, z), axis=0)
-
-
-def trans_invariant_density_alt_3D(atom_positions, sigma_3D, r_cutoff = np.inf, origin_index = 0):
-    """
-        be careful, the order of the return function is z,y,x
-    """
-    relative_distances_3D  = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
-    density = gaussian_fun_alt_3D(sigma_3D, relative_distances_3D)
-    return lambda z, y, x: np.sum(density(x, y, z), axis=0)
-
-def trans_invariant_density_3D_normailized(fun, x_lower, x_upper, y_lower, y_upper, z_lower, z_upper, N=1):
-    """
-    be careful, the order of the return function is z,y,x
-    """
-    result, error =  utils.integrate_XYZ_numerically(fun, x_lower, x_upper, y_lower, y_upper, z_lower, z_upper)
-    # normalized_density_function = utils.compute_normalisation_constant_to_N(result, N) * fun
-    # print(f"normalized_density_function={normalized_density_function}, error={error}")
-    return lambda z, y, x : utils.compute_normalisation_constant_to_N(result, N) * fun(z,y,x)
-
-
-if __name__ == '__main__':
-    # R_x = np.linspace(-100, 100, 100)
-    # R_y = np.linspace(-100, 100, 100)
-    # R_z = np.linspace(-100, 100, 100)
+@staticmethod
+def example_density():
     R_x = np.linspace(-5, 5, 100)
     R_y = np.linspace(-5, 5, 100)
     R_z = np.linspace(-5, 5, 100)
     xv, yv, zv = np.meshgrid(R_x, R_y, R_z)
-
     T_3D = np.array([0.1, 0.1, 0.1])
-    # T_3D = np.array([10, 20, 30])
-
     ############################  x      y,    z
     atom_3D_position = np.array([[0,     0,    0],
                                  [2,     2,    2],
                                  [-1,   -1,   -1]])
+    sigmas = np.array([2, 3, 4])
+    density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position + T_3D, sigmas)
+    # how to determine the upper bound and lower bound: 3-sigma rule
+    N = len(atom_3D_position)
+    bounds = utils.coupute_XYZ_bounds(atom_3D_position, sigmas)
+    print(f"the integration bounds for x,y,z are {bounds}")
 
-    ############################  x      y,    z
-    # atom_3D_position = np.array([[10,     10,    10],
-    #                              [30,   30,  30,],
-    #                              [-50, -50, -50]])
-    # density_function_3D = trans_invariant_density_alt_3D(atom_3D_position + T_3D, np.array([10, 10, 10]))
-    density = trans_invariant_density_alt_3D(atom_3D_position + T_3D, np.array([2, 3, 4]))
-    result = trans_invariant_density_3D_normailized(density, -15, 15, -15, 15, -15, 15)
+    normalized_density_function = utils.trans_invariant_density_3D_normalized(density_function_3D, *bounds, N)
     # print(f"Normalization constant = {utils.compute_normalisation_constant_to_N(result, 3)}")
-    result, error = utils.integrate_XYZ_numerically(result,-15, 15, -15, 15, -15, 15)
+    result, error = utils.integrate_XYZ_numerically(normalized_density_function, *bounds)
+    print(f"Numerical integral:{result}, it should be equal to {N}")
+    result = normalized_density_function(zv, yv, xv)
+    return result
 
-    print("Numerical integral:", result)
+if __name__ == '__main__':
+    example_density()
 
-    density_function_3D = trans_invariant_density_alt_3D(atom_3D_position + T_3D, np.array([2, 3, 4]))
+def plot_isosurface():
     # the order is important(z,y,x)
+    R_x = np.linspace(-5, 5, 100)
+    R_y = np.linspace(-5, 5, 100)
+    R_z = np.linspace(-5, 5, 100)
+    xv, yv, zv = np.meshgrid(R_x, R_y, R_z)
+    T_3D = np.array([0.1, 0.1, 0.1])
+    ############################  x      y,    z
+    atom_3D_position = np.array([[0, 0, 0],
+                                 [2, 2, 2],
+                                 [-1, -1, -1]])
+    sigmas = np.array([2, 3, 4])
+    density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position + T_3D, sigmas)
+
     values = density_function_3D(zv, yv, xv)
+    utils.plot_iosfurface(xv, yv, zv, values)
 
-
-    X, Y, Z = xv, yv, zv
-
-    fig = go.Figure(data=go.Isosurface(
-        x=X.flatten(),
-        y=Y.flatten(),
-        z=Z.flatten(),
-        value=values.flatten(),
-        isomin=np.min(values),
-        isomax=np.max(values),
-        surface_count=20,
-        colorscale='Viridis',
-        showscale=True,
-        caps=dict(x_show=False, y_show=False, z_show=False),
-    ))
-
-
-    fig.update_layout(
-        title='3D Isosurface Plot',
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Z'
-        ),
-        width=800,
-        height=800,
-    )
-
-    fig.show()
-    print(70 * "*")
