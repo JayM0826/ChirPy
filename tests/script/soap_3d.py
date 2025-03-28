@@ -9,6 +9,7 @@ Original file is located at
 
 import numpy as np
 
+import temp as temp
 import utils as utils
 
 
@@ -20,25 +21,27 @@ def example_density():
     xv, yv, zv = np.meshgrid(R_x, R_y, R_z)
     T_3D = np.array([0.1, 0.1, 0.1])
     ############################  x      y,    z
-    atom_3D_position = np.array([[0,     0,    0],
-                                 [2,     2,    2],
-                                 [-1,   -1,   -1]])
+    atom_3D_position = np.array([[0, 0, 0],
+                                 [2, 2, 2],
+                                 [-1, -1, -1]])
     sigmas = np.array([2, 3, 4])
-    density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position + T_3D, sigmas)
+    density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position, sigmas)
     # how to determine the upper bound and lower bound: 3-sigma rule
     N = len(atom_3D_position)
     bounds = utils.coupute_XYZ_bounds(atom_3D_position, sigmas)
     print(f"the integration bounds for x,y,z are {bounds}")
-
-    normalized_density_function = utils.trans_invariant_density_3D_normalized(density_function_3D, *bounds, N)
     # print(f"Normalization constant = {utils.compute_normalisation_constant_to_N(result, 3)}")
-    result, error = utils.integrate_XYZ_numerically(normalized_density_function, *bounds)
+    result, error = temp.integrate_XYZ_numerically(density_function_3D, *bounds)
     print(f"Numerical integral:{result}, it should be equal to {N}")
-    result = normalized_density_function(zv, yv, xv)
-    return result
+    result = density_function_3D(xv, yv, zv)
+    print(np.sum(result))
+
+    # return result
+
 
 if __name__ == '__main__':
-    example_density()
+    result = example_density()
+
 
 def plot_isosurface():
     # the order is important(z,y,x)
@@ -54,6 +57,9 @@ def plot_isosurface():
     sigmas = np.array([2, 3, 4])
     density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position + T_3D, sigmas)
 
-    values = density_function_3D(zv, yv, xv)
+    values = density_function_3D(xv, yv, zv)
+    print(np.sum(values))
     utils.plot_iosfurface(xv, yv, zv, values)
 
+
+# plot_isosurface()
