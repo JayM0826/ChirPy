@@ -37,16 +37,6 @@ CUBIC
  C      0.00000    0.00000  200.00000
  
 """
-a = np.random.rand(2,3)
-print(a)
-print(70  * "*")
-v = np.random.rand(2,3)
-print(v)
-print(70  * "*")
-
-
-print(np.sum(a + v))
-print(70  * "*")
 
 
 system = cp.trajectory.XYZ("tartrate.xyz").expand()
