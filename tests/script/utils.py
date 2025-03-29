@@ -4,10 +4,13 @@ import numpy as np
 import plotly.graph_objects as go
 from sympy import Symbol, integrate, sin, pi
 from sympy.functions.special.spherical_harmonics import Ynm
+from scipy.stats import multivariate_normal
+
 
 ONE_OVER_TWO_PI_POWER_1DIV2 = 1 / np.power(2 * np.pi, 0.5)
 ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
+
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=0):
@@ -119,9 +122,26 @@ def trans_invariant_density_alt_3D(atom_positions, sigma_3D, r_cutoff=np.inf, or
     # TODO use different origin
     relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     density_sequentially = gaussian_fun_alt_3D_sequentially(sigma_3D, relative_distances_3D)
-    # return density_sequentially
     return lambda x, y, z: density_sequentially(x, y, z)
 
+def trans_invariant_density_alt1_3D(atom_positions, sigma_3D, r_cutoff=np.inf, origin_index=0):
+    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    # density_sequentially = gaussian_fun_alt_3D_sequentially(sigma_3D, relative_distances_3D)
+    covs = np.eye(3) * np.array(sigma_3D)[:, np.newaxis, np.newaxis]
+    density_sequentially = np.array([multivariate_normal(mean=relative_distances_3D[i], cov=covs[i]) for i in range(len(sigma_3D))])
+
+
+    def sum_over(x, y, z):
+        # TODO refactor below code, it is low efficient
+        pos = np.stack([x, y, z], axis=-1)
+        mixed_pdf = 0
+        for mvn in density_sequentially:
+            # mixed_pdf += mvn.pdf([x, y ,z])
+            mixed_pdf += mvn.pdf(pos)
+
+        return mixed_pdf
+
+    return lambda x, y, z: sum_over(x, y, z)
 
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv):
     atom_positions = atom_positions[:, 0:3]
@@ -168,3 +188,5 @@ def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance
 
     print(f"So sum over all the density of frame, we got the distribution and the shape is {total_result.shape}")
     return total_result
+
+
