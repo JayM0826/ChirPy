@@ -31,7 +31,7 @@
 import numpy as _np
 import copy as _copy
 from scipy.interpolate import interpn as _interpn
-from scipy.integrate import simps as _simps
+from scipy.integrate import simpson as _simps
 from scipy.ndimage import gaussian_filter1d as _gaussian_filter1d
 import warnings as _warnings
 
@@ -99,7 +99,13 @@ class ScalarField(_CORE):
                         raise ValueError('Unknown format.')
 
         elif len(args) == 0:
+            grid_x = kwargs.pop('grid_x', None)
+            grid_y = kwargs.pop('grid_y', None)
+            grid_z = kwargs.pop('grid_z', None)
             self.__dict__ = self.__class__.from_data(**kwargs).__dict__
+            # self.grid_x = grid_x
+            # self.grid_y = grid_y
+            # self.grid_z = grid_z
 
         self._sync_class()
         if (sparse := kwargs.get('sparsity', 1)) != 1:
@@ -286,8 +292,15 @@ class ScalarField(_CORE):
                    )
         return True
 
-    def integral(self):
-        return self.voxel*_simps(_simps(_simps(self.data)))
+    def integral(self, volume_unit='au'):
+        # TODO must pass the corresponding integration samples. Unless the default sampling points all start from 0 with a step size of 1.
+        # return self.voxel*_simps(_simps(_simps(self.data, self.grid_z), self.grid_x), self.grid_y)
+        if volume_unit == 'au':
+            return self.voxel * _simps(_simps(_simps(self.data)))
+        elif volume_unit == 'aa**3':
+            return self.voxel * _simps(_simps(_simps(self.data))) * constants.l_au2aa ** 3
+        else:
+            raise ValueError('unknown volume unit:', volume_unit)
 
     def normalise(self, norm=None, thresh=1.E-8, **kwargs):
         '''Norm has to be a ScalarField object (can be of different shape) or

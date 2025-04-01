@@ -37,7 +37,7 @@ def cubeWriter(fn, comments, numbers, pos_aa, cell_vec_aa, data,
                append=False,
                origin_aa=[0.0, 0.0, 0.0]):
     '''Write grid/volume data into a Gaussian Cube file.
-       cell_vec_aa specifies the three cell vectors A, B, C in atomic units
+       cell_vec_aa specifies the three cell vectors A, B, C in angstrom
        numbers is a lists or tuple of atomic numbers (or any numbers).
        Expects a single cube frame and does not support direct
        output of cube trajectories (use an iterator and append=True for this).
@@ -49,7 +49,7 @@ def cubeWriter(fn, comments, numbers, pos_aa, cell_vec_aa, data,
     if append:
         fmt = 'a'
     with open(fn, fmt) as f:
-        outbuffer = _assemble_cube_file(
+        outbuffer = _assemble_cube_header(
                                 comments[0],
                                 comments[1],
                                 numbers,
@@ -59,16 +59,28 @@ def cubeWriter(fn, comments, numbers, pos_aa, cell_vec_aa, data,
                                 origin=origin_au
                                 )
         f.write(outbuffer)
+        # ---  write data block
+        dim = list(data.shape)
+        outbuffer = ''
+        for i_x in range(dim[0]):
+            for i_y in range(dim[1]):
+                for i_z in range(dim[2]):
+                    if i_z % 6 == 0 and i_z != 0:
+                        outbuffer += '\n'
+                    outbuffer += '%13.5E' % data[i_x][i_y][i_z]
+                outbuffer += '\n'
+            f.write(outbuffer)
+            outbuffer = ''
 
 
-def _assemble_cube_file(comment1,
-                        comment2,
-                        numbers,
-                        coords,
-                        cell,
-                        data,
-                        origin
-                        ):
+def _assemble_cube_header(comment1,
+                          comment2,
+                          numbers,
+                          coords,
+                          cell,
+                          data,
+                          origin
+                          ):
     '''Old code but stil in use. Revised and corrected in Dec 2019.'''
     obuffer = ''
     obuffer += comment1.rstrip('\n').replace('\n', '')+'\n'
@@ -99,13 +111,5 @@ def _assemble_cube_file(comment1,
                                                             coords[atom][1],
                                                             coords[atom][2]
                                                             )
-
-    for i_x in range(dim[0]):
-        for i_y in range(dim[1]):
-            for i_z in range(dim[2]):
-                if i_z % 6 == 0 and i_z != 0:
-                    obuffer += '\n'
-                obuffer += '%13.5E' % data[i_x][i_y][i_z]
-            obuffer += '\n'
 
     return obuffer
