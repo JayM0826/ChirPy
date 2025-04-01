@@ -99,13 +99,7 @@ class ScalarField(_CORE):
                         raise ValueError('Unknown format.')
 
         elif len(args) == 0:
-            grid_x = kwargs.pop('grid_x', None)
-            grid_y = kwargs.pop('grid_y', None)
-            grid_z = kwargs.pop('grid_z', None)
             self.__dict__ = self.__class__.from_data(**kwargs).__dict__
-            # self.grid_x = grid_x
-            # self.grid_y = grid_y
-            # self.grid_z = grid_z
 
         self._sync_class()
         if (sparse := kwargs.get('sparsity', 1)) != 1:
@@ -293,8 +287,6 @@ class ScalarField(_CORE):
         return True
 
     def integral(self, volume_unit='au'):
-        # TODO must pass the corresponding integration samples. Unless the default sampling points all start from 0 with a step size of 1.
-        # return self.voxel*_simps(_simps(_simps(self.data, self.grid_z), self.grid_x), self.grid_y)
         if volume_unit == 'au':
             return self.voxel * _simps(_simps(_simps(self.data)))
         elif volume_unit == 'aa**3':

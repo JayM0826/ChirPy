@@ -109,11 +109,35 @@ def gaussian_fun_alt_3D_sequentially(sigmas, relative_distances_3D, xv, yv, zv):
 
     return total_result
 
+def gaussian_fun_alt_3D_sequentially1(sigmas, relative_distances_3D):
+    # NB: r must be an array
+    relative_xs = relative_distances_3D[:, 0]
+    relative_ys = relative_distances_3D[:, 1]
+    relative_zs = relative_distances_3D[:, 2]
+    total_result = [
+        lambda x, y, z, rx=rx, ry=ry, rz=rz, s=s, pf=1 / (-2 * s ** 2): (
+                (ONE_OVER_TWO_PI_POWER_3DIV2 * 1. / np.power(s, 3))
+                * np.exp(pf * (x - rx) ** 2 + pf * (y - ry) ** 2 + pf * (z - rz) ** 2)
+        )
+        for rx, ry, rz, s in zip(relative_xs, relative_ys, relative_zs, sigmas)
+    ]
+
+    def combined_function(x, y, z):
+        return np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
+
+    return combined_function
 
 def trans_invariant_density_alt_3D(atom_positions, sigma_3D, xv, yv, zv, r_cutoff=np.inf, origin_index=0):
     # TODO use different origin
     relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     return gaussian_fun_alt_3D_sequentially(sigma_3D, relative_distances_3D, xv, yv, zv)
+
+def trans_invariant_density_alt_3D1(atom_positions, sigma_3D, r_cutoff=np.inf, origin_index=0):
+    # TODO use different origin
+    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    density_sequentially = gaussian_fun_alt_3D_sequentially1(sigma_3D, relative_distances_3D)
+    return lambda x, y, z: density_sequentially(x, y, z)
+
 
 def trans_invariant_density_alt1_3D(atom_positions, sigma_3D, r_cutoff=np.inf, origin_index=0):
     """
@@ -139,8 +163,8 @@ def trans_invariant_density_alt1_3D(atom_positions, sigma_3D, r_cutoff=np.inf, o
 
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv):
     atom_positions = atom_positions[:, 0:3]
-    return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
-
+    # return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
+    return trans_invariant_density_alt_3D1(atom_positions, sigmas)(xv, yv, zv)
 
 def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE):
     """
@@ -167,11 +191,11 @@ def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance
     print(f"grid detail:shape={xv.shape} bounds={bounds}")
     total_result = np.ndarray(xv.shape)
     i = 1
-    for atom_positions in trajectory[0:1, :, 0:3]:
+    for atom_positions in trajectory[:, :, 0:3]:
         print(f"Now start to calculate the density of frame {i}")
         new_result = compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv)
         # be careful: the order of simpson is R_z,R_x,R_y
-        print(f"Integration of density of frame {i} over all intervals is {integrate.simpson(integrate.simpson(integrate.simpson(new_result, zv[0,0,:]), xv[0, :, 0]), yv[:, 0, 0])}"
+        print(f"Integration of density of frame {i} over all intervals is {integrate.simpson(integrate.simpson(integrate.simpson(new_result, R_z), R_y), R_x)}"
               f", it should be equal to the number of atoms:{len(atom_positions)}")
         total_result += new_result
         print(f"The calculation of the density of frame {i} is over\n\n")

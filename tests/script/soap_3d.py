@@ -27,16 +27,16 @@ def example_density():
                                  [2, 2, 2],
                                  [-1, -1, -1]])
     sigmas = np.array([2, 3, 4])
-    density_function_3D = utils.trans_invariant_density_alt_3D(atom_3D_position, sigmas, xv, yv, zv)
-    # # how to determine the upper bound and lower bound: 3-sigma rule
-    # N = len(atom_3D_position)
-    # bounds = utils.coupute_XYZ_bounds(atom_3D_position, sigmas)
-    # print(f"the integration bounds for x,y,z are {bounds}")
-    # # print(f"Normalization constant = {utils.compute_normalisation_constant_to_N(result, 3)}")
-    # result, error = temp.integrate_XYZ_numerically(density_function_3D, *bounds)
-    # print(f"Numerical integral:{result}, it should be equal to {N}")
-    # result = density_function_3D(xv, yv, zv)
-    # print(np.sum(result))
+    density_function_3D = utils.trans_invariant_density_alt_3D1(atom_3D_position, sigmas)
+    # how to determine the upper bound and lower bound: 3-sigma rule
+    N = len(atom_3D_position)
+    bounds = utils.coupute_XYZ_bounds(atom_3D_position, sigmas)
+    print(f"the integration bounds for x,y,z are {bounds}")
+    # print(f"Normalization constant = {utils.compute_normalisation_constant_to_N(result, 3)}")
+    result, error = temp.integrate_XYZ_numerically(density_function_3D, *bounds)
+    print(f"Numerical integral:{result}, it should be equal to {N}")
+    result = density_function_3D(xv, yv, zv)
+    print(np.sum(result))
 
     # return result
 
@@ -63,6 +63,6 @@ def plot_isosurface():
     utils.plot_iosfurface(xv, yv, zv, density_function_3D)
 
 if __name__ == '__main__':
-    # result = example_density()
-    plot_isosurface()
+    result = example_density()
+    # plot_isosurface()
 # plot_isosurface()
