@@ -59,7 +59,7 @@ distribution /= len(system.data) # ???
 print(70 * "*")
 
 scalar_field = ScalarField(data=distribution, origin_aa=system.pos_aa[0,0] + np.array([R_x[0], R_y[0], R_z[0]]), pos_aa=system.pos_aa[0], numbers=cp.constants.symbols_to_numbers(system.symbols),
-                           cell_vec_aa=np.array([[R_x[1] - R_x[0], 0, 0],[0, R_y[1]- R_y[0], 0],[0, 0, R_z[1]- R_z[0]]]), grid_x=R_x, grid_y=R_y, grid_z=R_z)
+                           cell_vec_aa=np.array([[R_x[1] - R_x[0], 0, 0],[0, R_y[1]- R_y[0], 0],[0, 0, R_z[1]- R_z[0]]]))
 # scalar_field = ScalarField(data=distribution, origin_aa=system.pos_aa[0,0], pos_aa=system.pos_aa[0], numbers=cp.constants.symbols_to_numbers(system.symbols),
                            # cell_vec_aa=np.array([[1./2, 0, 0],[0, 1./2, 0],[0, 0, 1./2]]), grid_x=R_x, grid_y=R_y, grid_z=R_z)
 scalar_field.print_info()
