@@ -1,20 +1,24 @@
 import math as math
+from functools import partial
 
 import numpy as np
-
 import plotly.graph_objects as go
-from sympy import Symbol, integrate, sin, pi
-from sympy.functions.special.spherical_harmonics import Ynm
-from scipy.stats import multivariate_normal
-from scipy import integrate
+import scipy
+from mpmath import jacobian
+
+from sympy import integrate
+
+
+
 ONE_OVER_TWO_PI_POWER_1DIV2 = 1 / np.power(2 * np.pi, 0.5)
 ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
 ORIGIN_ATOM_INDEX = 0
-CUT_OFF = 3. # unit angstrom: 10**(-10) m
-SIGMA = 0.666
+# CUT_OFF = 2. # unit angstrom: 10**(-10) m
+CUT_OFF = 10 # unit angstrom: 10**(-10) m
+SIGMA = 1
 
-def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX):
+def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
     """
     atom_3D_positions:
     atom_3D_position = np.array([[0,     0,    0],
@@ -26,6 +30,12 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX
 
     """
     # shape = (N, 3), N means #atoms, 3 means relative distance of (x and y, z)
+    if cutoff != np.inf:
+        x_upper, y_upper, z_upper = cutoff, cutoff, cutoff,
+        x_lower, y_lower, z_lower = - cutoff,- cutoff, - cutoff
+        return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
+
+    # otherwise
     atom_3D_relative_positions = atom_3D_positions - atom_3D_positions[origin_index]
 
     max_values = np.max((atom_3D_relative_positions), axis=0)
@@ -37,27 +47,6 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX
     return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
 
 
-def integrate_spherical_fun_analytically(n, m):
-    # Spherical coordinates: dV = ρ² sin(φ) dρ dθ dφ
-    # Expected variables: ρ (radius), θ (azimuth), φ (polar angle)
-    # if len(symbols) != 2:
-    #     raise ValueError("Spherical coordinates require 2 variables (θ, φ)")
-    theta = Symbol('theta')
-    phi = Symbol('phi')
-
-    Y = Ynm(n, m, theta, phi)
-    integrand = Y * sin(theta)
-
-    phi_integral = integrate(integrand, (phi, 0, 2 * pi))
-    total_integral = integrate(phi_integral, (theta, 0, pi))
-    return total_integral
-    # Integrate with respect to each variable
-    # for var in reversed(symbols):
-    #     if var not in bounds:
-    #         raise ValueError(f"Bounds for {var} not provided")
-    #     lower, upper = bounds[var]
-    #     result = sympy.integrate(result, (var, lower, upper))
-    # return total_integral
 
 
 def plot_iosfurface(xv, yv, zv, values):
@@ -92,34 +81,19 @@ def plot_iosfurface(xv, yv, zv, values):
     fig.show()
     print(70 * "*")
 
-def gaussian_fun_alt_3D_sequentially(sigmas, relative_distances_3D, xv, yv, zv):
-    # NB: r must be an array
-    relative_xs = relative_distances_3D[:, 0]
-    relative_ys = relative_distances_3D[:, 1]
-    relative_zs = relative_distances_3D[:, 2]
-    total_result = np.zeros(shape=xv.shape)
-    for relative_x, relative_y, relative_z, sigma in zip(relative_xs, relative_ys, relative_zs, sigmas):
-        # here we assume the sigma for all 3 directions are same, obviously they can be different
-        prefactor = 1 / (-2 * sigma ** 2)
-        guassion_funciton = lambda x, y, z: ((ONE_OVER_TWO_PI_POWER_3DIV2 * 1. / np.power(sigma, 3))
-                                  * np.exp(prefactor * (x - relative_x) ** 2
-                                           + prefactor * (y - relative_y) ** 2
-                                           + prefactor * (z - relative_z) ** 2))
-        total_result += guassion_funciton(xv, yv, zv)
 
-    return total_result
 
-def gaussian_fun_alt_3D_sequentially1(sigmas, relative_distances_3D, smooth_efficient):
+def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
     # NB: r must be an array
     relative_xs = relative_distances_3D[:, 0]
     relative_ys = relative_distances_3D[:, 1]
     relative_zs = relative_distances_3D[:, 2]
     total_result = [
-        lambda x, y, z, rx=rx, ry=ry, rz=rz, s=s, pf=1 / (-2 * s ** 2), smooth_efficient=smooth_coeff: (
-                smooth_efficient * (ONE_OVER_TWO_PI_POWER_3DIV2 * 1. / np.power(s, 3))
-                * np.exp(pf * (x - rx) ** 2 + pf * (y - ry) ** 2 + pf * (z - rz) ** 2)
+        lambda x, y, z, rx=rx, ry=ry, rz=rz, sigma=sigma, pf=1 / (-2 * sigma ** 2), smooth_coefficient=smooth_coeff: (
+                smooth_coefficient * (ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
+                * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 +  (z - rz) ** 2))
         )
-        for rx, ry, rz, s, smooth_coeff in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_efficient)
+        for rx, ry, rz, sigma, smooth_coeff in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
     ]
 
     def combined_function(x, y, z):
@@ -127,44 +101,49 @@ def gaussian_fun_alt_3D_sequentially1(sigmas, relative_distances_3D, smooth_effi
 
     return combined_function
 
-def trans_invariant_density_alt_3D(atom_positions, sigma_3D, xv, yv, zv, r_cutoff=CUT_OFF, origin_index=ORIGIN_ATOM_INDEX):
+def gaussian_spherical_fun_factory(fun, r, theta, phi):
+    """
+    fun: cartesian gaussian function
+    """
+    # Convert spherical to Cartesian
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+    # jacobian = r ** 2 * np.sin(theta)
+    jacobian = 1 # No need jacobian
+    return fun(x, y, z) * jacobian
+
+def integrand(f_spherical, r):
+    order = 131
+    points, weights = scipy.integrate.lebedev_rule(order)
+    x, y, z = points
+    theta = np.arccos(z)
+    phi = np.arctan2(y, x)
+    values = f_spherical(r, theta, phi)
+    surface_integral = np.sum(weights * values)
+    return r**2 * surface_integral
+
+def integration_sph(density_fun, R=CUT_OFF):
+    integral, _ = scipy.integrate.quad(partial(integrand, partial(gaussian_spherical_fun_factory, density_fun)), 0, R)
+    print(f"integration_sph : Integral result: {integral}")
+
+def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF, origin_index=ORIGIN_ATOM_INDEX):
     # TODO use different origin
     relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
-    return gaussian_fun_alt_3D_sequentially(sigma_3D, relative_distances_3D, xv, yv, zv)
+    density_fun = gaussian_fun_3D(sigma_3D, relative_distances_3D, smooth_efficient)
 
-def trans_invariant_density_alt_3D1(atom_positions, sigma_3D, smooth_efficient,  r_cutoff=CUT_OFF, origin_index=ORIGIN_ATOM_INDEX):
-    # TODO use different origin
-    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
-    density_sequentially = gaussian_fun_alt_3D_sequentially1(sigma_3D, relative_distances_3D, smooth_efficient)
-    return lambda x, y, z: density_sequentially(x, y, z)
+    integration_sph(density_fun)
+
+    return lambda x, y, z: density_fun(x, y, z)
 
 
-def trans_invariant_density_alt1_3D(atom_positions, sigma_3D, r_cutoff=np.inf, origin_index=0):
-    """
-    be careful to use below code, it is just used for how to use multivariate_normal,
-    """
-    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
-    # density_sequentially = gaussian_fun_alt_3D_sequentially(sigma_3D, relative_distances_3D)
-    covs = np.eye(3) * np.array(sigma_3D)[:, np.newaxis, np.newaxis]
-    density_sequentially = np.array([multivariate_normal(mean=relative_distances_3D[i], cov=covs[i]) for i in range(len(sigma_3D))])
 
 
-    def sum_over(x, y, z):
-        # TODO refactor below code, it is low efficient
-        pos = np.stack([x, y, z], axis=-1)
-        mixed_pdf = 0
-        for mvn in density_sequentially:
-            # mixed_pdf += mvn.pdf([x, y ,z])
-            mixed_pdf += mvn.pdf(pos)
-
-        return mixed_pdf
-
-    return lambda x, y, z: sum_over(x, y, z)
 
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv, smooth_efficient):
     atom_positions = atom_positions[:, 0:3]
     # return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
-    return trans_invariant_density_alt_3D1(atom_positions, sigmas, smooth_efficient)(xv, yv, zv)
+    return trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)(xv, yv, zv)
 
 def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE, origin_index=ORIGIN_ATOM_INDEX):
     """
@@ -193,19 +172,22 @@ def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance
     print(f"grid detail:shape={xv.shape} bounds={bounds}")
     total_result = np.ndarray(xv.shape)
     i = 1
-    for atom_positions in trajectory[:, :, 0:3]:
+    for atom_positions in trajectory[:1, :, 0:3]:
         print(f"Now start to calculate the density of frame {i}")
         filtered_first_frame, smooth_efficient = filter_atoms_within_cutoff(atom_positions, cutoff=cutoff)
         new_result = compute_whole_grid_density(filtered_first_frame, sigmas, xv, yv, zv, smooth_efficient)
         # be careful: the order of simpson is R_z,R_x,R_y
-        print(f"Integration of density of frame {i} over all intervals is {integrate.simpson(integrate.simpson(integrate.simpson(new_result, R_z), R_y), R_x)}"
+        print(f"Integration of density of frame {i} over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(new_result, R_z), R_y), R_x)}"
               f", it should be equal to the number of atoms:{len(atom_positions)}")
+
+
+
         total_result += new_result
         print(f"The calculation of the density of frame {i} is overnn")
         i += 1
 
     print(f"So sum over all the density of frame, we got the distribution and the shape is {total_result.shape}")
-    print(f"Integration of density of frame all over all intervals is {integrate.simpson(integrate.simpson(integrate.simpson(total_result, R_z), R_y), R_x)}")
+    print(f"Integration of density of frame all over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(total_result, R_z), R_y), R_x)}")
 
     return total_result, R_x, R_y, R_z
 
@@ -232,7 +214,9 @@ def filter_atoms_within_cutoff(positions, origin_atom_index = ORIGIN_ATOM_INDEX,
     qualified_indices = np.where(relative_distance <= (cutoff))[0]
 
     qualified_atom_positions = positions[qualified_indices]
-    smooth_efficient = smooth_function(relative_distance[qualified_indices], cutoff)
+    # smooth_efficient = smooth_function(relative_distance[qualified_indices], cutoff)
+    # TODO in fact there is no smooth if use the below code instead of the above line
+    smooth_efficient = np.ones(len((qualified_atom_positions)))
     return qualified_atom_positions, smooth_efficient
 
 
@@ -249,9 +233,9 @@ def smooth_function(relative_distance, cutoff = CUT_OFF):
     .. [2] https://math.stackexchange.com/questions/1618981/cutoff-function-vs-mollifiers
     """
     relative_distance = np.asarray(relative_distance)
-    smooth_efficient = np.zeros_like(relative_distance, dtype=float)
+    smooth_coefficient = np.zeros_like(relative_distance, dtype=float)
     mask = relative_distance < cutoff
     # smooth
-    smooth_efficient[mask] = 0.5 * (1 + np.cos(np.pi * relative_distance[mask] / cutoff))
-    print(relative_distance, smooth_efficient)
-    return smooth_efficient
+    smooth_coefficient[mask] = 0.5 * (1 + np.cos(np.pi * relative_distance[mask] / cutoff))
+    print(relative_distance, smooth_coefficient)
+    return smooth_coefficient

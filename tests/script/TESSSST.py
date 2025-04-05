@@ -37,6 +37,29 @@ CUBIC
  
 """
 
+# from scipy.integrate import quad, lebedev_rule
+# import numpy as np
+#
+# def f_spherical(r, theta, phi):
+#     x = r * np.sin(theta) * np.cos(phi)
+#     y = r * np.sin(theta) * np.sin(phi)
+#     z = r * np.cos(theta)
+#     return x**2 + y**2
+#
+# def integrand(r):
+#     order = 11
+#     points, weights = lebedev_rule(order)
+#     x, y, z = points
+#     theta = np.arccos(z)
+#     phi = np.arctan2(y, x)
+#     values = f_spherical(r, theta, phi)
+#     surface_integral = np.sum(weights * values)
+#     return r**2 * surface_integral
+#
+# R = 2.0
+# integral, _ = quad(integrand, 0, R)
+# print(f"体积分结果: {integral}")
+
 system = cp.trajectory.XYZ("tartrate.xyz").expand()
 print(70 * "*")
 print(70 * "*")
@@ -52,13 +75,14 @@ distribution, R_x, R_y, R_z = utils.compute_whole_grid_distribution(system.data,
 print(f"x step size:{R_x[1] - R_x[0]}, len of R_x={len(R_x)}, and result = {len(R_x) * (R_x[1] - R_x[0])}")
 print(f"y step size:{R_y[1] - R_y[0]}, len of R_y={len(R_y)}, and result = {len(R_y) * (R_y[1] - R_y[0])}")
 print(f"z step size:{R_z[1] - R_z[0]}, len of R_z={len(R_z)}, and result = {len(R_z) * (R_z[1] - R_z[0])}")
-distribution /= len(system.data) # ???
+# distribution /= len(system.data) # ???
 
 # print(f"distribution is {np.sum(distribution)}")
 # utils.plot_iosfurface(xv, yv, zv, values)
 print(70 * "*")
 
-scalar_field = ScalarField(data=distribution, origin_aa=system.pos_aa[0,0] + np.array([R_x[0], R_y[0], R_z[0]]), pos_aa=system.pos_aa[0], numbers=cp.constants.symbols_to_numbers(system.symbols),
+scalar_field = ScalarField(data=distribution, origin_aa=system.pos_aa[0,0] + np.array([R_x[0], R_y[0], R_z[0]]), pos_aa=system.pos_aa[0],
+                           numbers=cp.constants.symbols_to_numbers(system.symbols),
                            cell_vec_aa=np.array([[R_x[1] - R_x[0], 0, 0],[0, R_y[1]- R_y[0], 0],[0, 0, R_z[1]- R_z[0]]]))
 # scalar_field = ScalarField(data=distribution, origin_aa=system.pos_aa[0,0], pos_aa=system.pos_aa[0], numbers=cp.constants.symbols_to_numbers(system.symbols),
                            # cell_vec_aa=np.array([[1./2, 0, 0],[0, 1./2, 0],[0, 0, 1./2]]), grid_x=R_x, grid_y=R_y, grid_z=R_z)
