@@ -160,10 +160,7 @@ def integrate_spherical_fun_analytically(n, m):
     # Expected variables: ρ (radius), θ (azimuth), φ (polar angle)
     # if len(symbols) != 2:
     #     raise ValueError("Spherical coordinates require 2 variables (θ, φ)")
-    theta = Symbol('theta')
-    phi = Symbol('phi')
-
-    Y = Ynm(n, m, theta, phi)
+    Y, phi, theta = Yml(m, n)
     integrand = Y * sin(theta)
 
     phi_integral = integrate(integrand, (phi, 0, 2 * pi))
@@ -178,6 +175,11 @@ def integrate_spherical_fun_analytically(n, m):
     # return total_integral
 
 
+def Yml(m, l):
+    theta = Symbol('theta')
+    phi = Symbol('phi')
+    Y = Ynm(m, l, theta, phi)
+    return Y, phi, theta
 
 
 @staticmethod

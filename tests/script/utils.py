@@ -4,19 +4,18 @@ from functools import partial
 import numpy as np
 import plotly.graph_objects as go
 import scipy
-from mpmath import jacobian
-
-from sympy import integrate
-
-
+from sympy.functions.special.spherical_harmonics import Ynm, Ynm_c, Znm
+from sympy import Symbol, integrate
+import sympy as sp
 
 ONE_OVER_TWO_PI_POWER_1DIV2 = 1 / np.power(2 * np.pi, 0.5)
 ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
 ORIGIN_ATOM_INDEX = 0
 # CUT_OFF = 2. # unit angstrom: 10**(-10) m
-CUT_OFF = 10 # unit angstrom: 10**(-10) m
+CUT_OFF = 10  # unit angstrom: 10**(-10) m
 SIGMA = 1
+
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
     """
@@ -32,7 +31,7 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX
     # shape = (N, 3), N means #atoms, 3 means relative distance of (x and y, z)
     if cutoff != np.inf:
         x_upper, y_upper, z_upper = cutoff, cutoff, cutoff,
-        x_lower, y_lower, z_lower = - cutoff,- cutoff, - cutoff
+        x_lower, y_lower, z_lower = - cutoff, - cutoff, - cutoff
         return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
 
     # otherwise
@@ -45,8 +44,6 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX
     x_lower, y_lower, z_lower = min_values - np.max(sigmas) * 6
     # easy to use linspace with int
     return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
-
-
 
 
 def plot_iosfurface(xv, yv, zv, values):
@@ -82,7 +79,6 @@ def plot_iosfurface(xv, yv, zv, values):
     print(70 * "*")
 
 
-
 def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
     # NB: r must be an array
     relative_xs = relative_distances_3D[:, 0]
@@ -91,7 +87,7 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
     total_result = [
         lambda x, y, z, rx=rx, ry=ry, rz=rz, sigma=sigma, pf=1 / (-2 * sigma ** 2), smooth_coefficient=smooth_coeff: (
                 smooth_coefficient * (ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
-                * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 +  (z - rz) ** 2))
+                * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 + (z - rz) ** 2))
         )
         for rx, ry, rz, sigma, smooth_coeff in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
     ]
@@ -101,35 +97,28 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
 
     return combined_function
 
-def gaussian_spherical_fun_factory(fun, r, theta, phi):
-    """
-    fun: cartesian gaussian function
-    """
-    # Convert spherical to Cartesian
-    x = r * np.sin(theta) * np.cos(phi)
-    y = r * np.sin(theta) * np.sin(phi)
-    z = r * np.cos(theta)
-    # jacobian = r ** 2 * np.sin(theta)
-    jacobian = 1 # No need jacobian
-    return fun(x, y, z) * jacobian
 
 def integrand(f_spherical, r):
+    # order can be dynamic based on r, because when r is small, no need to sample too many points
     order = 131
     points, weights = scipy.integrate.lebedev_rule(order)
-    x, y, z = points
-    theta = np.arccos(z)
-    phi = np.arctan2(y, x)
-    values = f_spherical(r, theta, phi)
+    x, y, z = points * r  # scaled sample points
+    values = f_spherical(x, y, z)
     surface_integral = np.sum(weights * values)
-    return r**2 * surface_integral
+    return r ** 2 * surface_integral
 
-def integration_sph(density_fun, R=CUT_OFF):
-    integral, _ = scipy.integrate.quad(partial(integrand, partial(gaussian_spherical_fun_factory, density_fun)), 0, R)
+
+def integration_sph(density_fun, r):
+    # simplify it
+    integral, _ = scipy.integrate.quad(partial(integrand, density_fun), 0, r)
     print(f"integration_sph : Integral result: {integral}")
 
-def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF, origin_index=ORIGIN_ATOM_INDEX):
-    # TODO use different origin
-    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+
+def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF,
+                               origin_index=ORIGIN_ATOM_INDEX):
+    # TODO use different origin, and only care about the neighbour, not including the origin atom
+    relative_distances_3D = atom_positions - atom_positions[
+        origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     density_fun = gaussian_fun_3D(sigma_3D, relative_distances_3D, smooth_efficient)
 
     integration_sph(density_fun)
@@ -137,15 +126,14 @@ def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cut
     return lambda x, y, z: density_fun(x, y, z)
 
 
-
-
-
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv, smooth_efficient):
     atom_positions = atom_positions[:, 0:3]
     # return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
     return trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)(xv, yv, zv)
 
-def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE, origin_index=ORIGIN_ATOM_INDEX):
+
+def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE,
+                             origin_index=ORIGIN_ATOM_INDEX):
     """
        number_per_unit_distance: the grid number per unit distance
     """
@@ -158,7 +146,8 @@ def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NU
     return xv, yv, zv, bounds, R_x, R_y, R_z
 
 
-def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE, cutoff=CUT_OFF):
+def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE,
+                                    cutoff=CUT_OFF):
     """
         number_per_unit_distance: the grid number per unit distance
         trajectory shape should be (No_frame, No_atoms, No_coordiantes)
@@ -177,19 +166,20 @@ def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance
         filtered_first_frame, smooth_efficient = filter_atoms_within_cutoff(atom_positions, cutoff=cutoff)
         new_result = compute_whole_grid_density(filtered_first_frame, sigmas, xv, yv, zv, smooth_efficient)
         # be careful: the order of simpson is R_z,R_x,R_y
-        print(f"Integration of density of frame {i} over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(new_result, R_z), R_y), R_x)}"
-              f", it should be equal to the number of atoms:{len(atom_positions)}")
-
-
+        print(
+            f"Integration of density of frame {i} over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(new_result, R_z), R_y), R_x)}"
+            f", it should be equal to the number of atoms:{len(atom_positions)}")
 
         total_result += new_result
         print(f"The calculation of the density of frame {i} is overnn")
         i += 1
 
     print(f"So sum over all the density of frame, we got the distribution and the shape is {total_result.shape}")
-    print(f"Integration of density of frame all over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(total_result, R_z), R_y), R_x)}")
+    print(
+        f"Integration of density of frame all over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(total_result, R_z), R_y), R_x)}")
 
     return total_result, R_x, R_y, R_z
+
 
 def get_sigmas(atoms):
     # TODO build a dict and store the sigmas for the atoms and retrieve them when needed
@@ -197,7 +187,7 @@ def get_sigmas(atoms):
     return np.ones(len(atoms)) * SIGMA
 
 
-def filter_atoms_within_cutoff(positions, origin_atom_index = ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
+def filter_atoms_within_cutoff(positions, origin_atom_index=ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
     """
     Filter atoms within a cutoff distance from a central atom.
 
@@ -220,7 +210,7 @@ def filter_atoms_within_cutoff(positions, origin_atom_index = ORIGIN_ATOM_INDEX,
     return qualified_atom_positions, smooth_efficient
 
 
-def smooth_function(relative_distance, cutoff = CUT_OFF):
+def smooth_function(relative_distance, cutoff=CUT_OFF):
     r"""
     Comparison
     The function is defined as:
@@ -239,3 +229,52 @@ def smooth_function(relative_distance, cutoff = CUT_OFF):
     smooth_coefficient[mask] = 0.5 * (1 + np.cos(np.pi * relative_distance[mask] / cutoff))
     print(relative_distance, smooth_coefficient)
     return smooth_coefficient
+
+
+def Yml(l, m):
+    theta = Symbol('theta')
+    phi = Symbol('phi')
+    Y = Ynm(m, l, theta, phi)
+    return Y, phi, theta
+
+
+if __name__ == '__main__':
+    sp.pprint(Yml(1, 2)[0])
+    # Define symbols
+    x, y = sp.symbols('x y')
+
+    # Define an equation: x + y = 2
+    equation = sp.Eq(x + y, 2)
+    sp.pprint(equation)
+    print(sp.latex(equation))
+
+    # Define symbols
+    x, y, z, sigma = sp.symbols('x y z sigma')
+    r0_x, r0_y, r0_z = sp.symbols('r0_x r0_y r0_z')  # Components of r0
+    A = sp.symbols('A')  # Normalization constant
+
+    # Define the distance squared: |r - r0|^2
+    distance_squared = (x - r0_x) ** 2 + (y - r0_y) ** 2 + (z - r0_z) ** 2
+
+    # Define the Gaussian expression
+    gaussian = A * sp.exp(-distance_squared / (2 * sigma ** 2))
+
+    # Substitute r0 = (1.5, 0, 0) and sigma = 0.5
+    gaussian_sub = gaussian.subs({r0_x: 1.5, r0_y: 0, r0_z: 0, sigma: 0.5})
+    print(gaussian_sub)
+    sp.pprint(gaussian_sub)
+    print(sp.latex(gaussian_sub))
+
+
+def backwards_check(pho, Ylms):
+    l_max = 10
+    result = 0
+    coeff = 1.
+    for l in np.arange(0, l_max + 1, dtype=int):
+        for m in np.arange(-l, l, dtype=int):
+            result += Yml(l, m) * coeff
+
+    if (pho == result):
+        return True
+    else:
+        return False
