@@ -13,7 +13,7 @@ ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
 ORIGIN_ATOM_INDEX = 0
 # CUT_OFF = 2. # unit angstrom: 10**(-10) m
-CUT_OFF = 10  # unit angstrom: 10**(-10) m
+CUT_OFF = 3.5  # unit angstrom: 10**(-10) m
 SIGMA = 1
 
 
@@ -89,7 +89,9 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
                 smooth_coefficient * (ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
                 * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 + (z - rz) ** 2))
         )
-        for rx, ry, rz, sigma, smooth_coeff in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
+        for rx, ry, rz, sigma, smooth_coeff
+        in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
+        if (rx != 0 and ry != 0 and rz != 0) # ignore the origin atom
     ]
 
     def combined_function(x, y, z):
@@ -98,31 +100,63 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
     return combined_function
 
 
-def integrand(f_spherical, r):
+def cartesian_to_spherical(x, y, z, r):
+    """
+    Convert Cartesian coordinates (x, y, z) to spherical coordinates (theta, phi).
+
+    Parameters:
+    x (float or np.ndarray): x-coordinate(s).
+    y (float or np.ndarray): y-coordinate(s).
+    z (float or np.ndarray): z-coordinate(s).
+
+    Returns:
+    tuple: (theta, phi)
+        - theta (float or np.ndarray): Polar angle in [0, pi].
+        - phi (float or np.ndarray): Azimuthal angle in [0, 2*pi).
+    """
+    # Handle the case where r = 0 to avoid division by zero
+    # At the origin, set theta = 0, phi = 0 as a convention
+    theta = np.where(r == 0, 0.0, np.arccos(z / np.where(r == 0, 1.0, r)))
+
+    # Compute phi using atan2, which handles all quadrants correctly
+    phi = np.arctan2(y, x)
+
+    # Ensure phi is in [0, 2*pi)
+    phi = np.where(phi < 0, phi + 2 * np.pi, phi)
+
+    return theta, phi
+
+
+def integrand(f_spherical, spherical_harmonics_Zlm_sph_version, r):
     # order can be dynamic based on r, because when r is small, no need to sample too many points
     order = 131
     points, weights = scipy.integrate.lebedev_rule(order)
     x, y, z = points * r  # scaled sample points
-    values = f_spherical(x, y, z)
+    values = f_spherical(x, y, z) * spherical_harmonics_Zlm_sph_version(*cartesian_to_spherical(x, y, z, r))
     surface_integral = np.sum(weights * values)
-    return r ** 2 * surface_integral
+    return r ** 2 * surface_integral * radial_basis_gn()
 
 
-def integration_sph(density_fun, r):
+def integration_sph(density_fun, spherical_harmonics_Zlm_sph_version, r):
     # simplify it
-    integral, _ = scipy.integrate.quad(partial(integrand, density_fun), 0, r)
-    print(f"integration_sph : Integral result: {integral}")
+    integral, _ = scipy.integrate.quad(partial(integrand, density_fun, spherical_harmonics_Zlm_sph_version) , 0, r)
+    # print(f"integration_sph_coefficient : Integral result: {integral}")
+    return integral
 
 
 def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF,
                                origin_index=ORIGIN_ATOM_INDEX):
     # TODO use different origin, and only care about the neighbour, not including the origin atom
-    relative_distances_3D = atom_positions - atom_positions[
-        origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     density_fun = gaussian_fun_3D(sigma_3D, relative_distances_3D, smooth_efficient)
-
-    integration_sph(density_fun)
-
+    l_max = 10
+    coeffs=[]
+    for l in np.arange(0, l_max + 1, dtype=int):
+        for m in np.arange(-l, l+1, dtype=int):
+            spherical_harmonics_Zlm_sph_version = evaluate_on_unit_sphere(l, m)
+            coeff = integration_sph(density_fun, spherical_harmonics_Zlm_sph_version, r_cutoff)
+            print(f"integration_sph_coefficient : coefficient for Y_{l}_{m}: {coeff}")
+            coeffs.append(coeff)
     return lambda x, y, z: density_fun(x, y, z)
 
 
@@ -131,6 +165,8 @@ def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv, smooth_effici
     # return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
     return trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)(xv, yv, zv)
 
+def radial_basis_gn():
+    return 1
 
 def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE,
                              origin_index=ORIGIN_ATOM_INDEX):
@@ -161,11 +197,12 @@ def compute_whole_grid_distribution(trajectory, sigmas, number_per_unit_distance
     print(f"grid detail:shape={xv.shape} bounds={bounds}")
     total_result = np.ndarray(xv.shape)
     i = 1
+    # here just use the first frame of the trajectory
     for atom_positions in trajectory[:1, :, 0:3]:
         print(f"Now start to calculate the density of frame {i}")
         filtered_first_frame, smooth_efficient = filter_atoms_within_cutoff(atom_positions, cutoff=cutoff)
         new_result = compute_whole_grid_density(filtered_first_frame, sigmas, xv, yv, zv, smooth_efficient)
-        # be careful: the order of simpson is R_z,R_x,R_y
+        # be careful: the order of simpson is R_z, R_x,R_y
         print(
             f"Integration of density of frame {i} over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(new_result, R_z), R_y), R_x)}"
             f", it should be equal to the number of atoms:{len(atom_positions)}")
@@ -231,50 +268,47 @@ def smooth_function(relative_distance, cutoff=CUT_OFF):
     return smooth_coefficient
 
 
-def Yml(l, m):
-    theta = Symbol('theta')
-    phi = Symbol('phi')
-    Y = Ynm(m, l, theta, phi)
-    return Y, phi, theta
+def Y_lm_real(l, m):
+    """
+        build real spherical harmonics
+        Parameters:
+        l (int): Degree of the spherical harmonic.
+        m (int): Order of the spherical harmonic.
+        Returns:
+        Znm, theta symbol, phi symbol
+        """
+    theta_sym, phi_sym = sp.symbols('theta phi', real=True)
+    Y = Znm(l, m, theta_sym, phi_sym)
+    return Y, theta_sym, phi_sym
 
 
-if __name__ == '__main__':
-    sp.pprint(Yml(1, 2)[0])
-    # Define symbols
-    x, y = sp.symbols('x y')
+def evaluate_on_unit_sphere(l, m):
+    """
+    Evaluate a spherical harmonic at a point (theta, phi) on the unit sphere.
 
-    # Define an equation: x + y = 2
-    equation = sp.Eq(x + y, 2)
-    sp.pprint(equation)
-    print(sp.latex(equation))
-
-    # Define symbols
-    x, y, z, sigma = sp.symbols('x y z sigma')
-    r0_x, r0_y, r0_z = sp.symbols('r0_x r0_y r0_z')  # Components of r0
-    A = sp.symbols('A')  # Normalization constant
-
-    # Define the distance squared: |r - r0|^2
-    distance_squared = (x - r0_x) ** 2 + (y - r0_y) ** 2 + (z - r0_z) ** 2
-
-    # Define the Gaussian expression
-    gaussian = A * sp.exp(-distance_squared / (2 * sigma ** 2))
-
-    # Substitute r0 = (1.5, 0, 0) and sigma = 0.5
-    gaussian_sub = gaussian.subs({r0_x: 1.5, r0_y: 0, r0_z: 0, sigma: 0.5})
-    print(gaussian_sub)
-    sp.pprint(gaussian_sub)
-    print(sp.latex(gaussian_sub))
+    Parameters:
+    l (int): Degree of the spherical harmonic.
+    m (int): Order of the spherical harmonic.
+    theta (float): Polar angle.
+    phi (float): Azimuthal angle.
+    Returns:
+    float: Value of the spherical harmonic.
+    """
+    Y_lm, theta_sym, phi_sym = Y_lm_real(l, m)
+    Y_lm = Y_lm.expand(func=True)
+    f = sp.lambdify((theta_sym, phi_sym), Y_lm, 'numpy')
+    return lambda theta, phi: f(theta, phi).real
 
 
-def backwards_check(pho, Ylms):
-    l_max = 10
+def backwards_check(pho, l_max = 10):
     result = 0
     coeff = 1.
     for l in np.arange(0, l_max + 1, dtype=int):
         for m in np.arange(-l, l, dtype=int):
-            result += Yml(l, m) * coeff
+            result += Y_lm_real(l, m)[0] * coeff
 
     if (pho == result):
         return True
     else:
         return False
+

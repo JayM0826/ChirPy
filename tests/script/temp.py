@@ -273,5 +273,160 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, xv, yv, zv):
         total_result += guassion_funciton(xv, yv, zv)
     return total_result
 
+
+def convert_spherical_harmonic_to_cartesian(l, m):
+    """
+    Convert a real spherical harmonic Z_{l,m}(theta, phi) to its Cartesian form.
+
+    Parameters:
+    l (int): Degree of the spherical harmonic (non-negative integer).
+    m (int): Order of the spherical harmonic (-l <= m <= l).
+
+    Returns:
+    tuple: (angular_form, cartesian_form) where:
+        - angular_form is the expression in terms of theta, phi.
+        - cartesian_form is the expression in terms of x, y, z, r.
+    """
+    # Define angular coordinates
+    theta, phi = sp.symbols('theta phi')
+
+    # Define Cartesian coordinates
+    x, y, z, r = sp.symbols('x y z r')
+
+    # Compute the real spherical harmonic using Znm
+    Y_lm_real = Znm(l, m, theta, phi)
+
+
+    # Define substitutions for spherical to Cartesian coordinates
+    substitutions = {
+        sp.sin(theta): sp.sqrt(x ** 2 + y ** 2) / r,
+        sp.cos(theta): z / r,
+        sp.sin(phi): y / sp.sqrt(x ** 2 + y ** 2),
+        sp.cos(phi): x / sp.sqrt(x ** 2 + y ** 2),
+    }
+
+    # Handle trigonometric functions of 2*phi and 2*theta
+    sin_2phi = 2 * substitutions[sp.sin(phi)] * substitutions[sp.cos(phi)]
+    sin_2phi = sin_2phi.simplify()  # 2*x*y/(x^2 + y^2)
+
+    cos_2phi = substitutions[sp.cos(phi)] ** 2 - substitutions[sp.sin(phi)] ** 2
+    cos_2phi = cos_2phi.simplify()  # (x^2 - y^2)/(x^2 + y^2)
+
+    sin_2theta = 2 * substitutions[sp.sin(theta)] * substitutions[sp.cos(theta)]
+    sin_2theta = sin_2theta.simplify()  # 2*sqrt(x^2 + y^2)*z/r^2
+
+    # Additional substitutions for higher-order terms
+    additional_subs = {
+        sp.sin(2 * phi): sin_2phi,
+        sp.cos(2 * phi): cos_2phi,
+        sp.sin(2 * theta): sin_2theta,
+        sp.sin(theta) ** 2: (x ** 2 + y ** 2) / r ** 2,
+        sp.cos(theta) ** 2: z ** 2 / r ** 2,
+    }
+
+    # Combine all substitutions
+    substitutions.update(additional_subs)
+
+    # Substitute and simplify
+    Y_lm_real = Y_lm_real.expand(func=True)
+    Y_lm_cartesian = Y_lm_real.subs(substitutions)
+
+    # Adjust for the r^l factor (spherical harmonics are defined on r=1)
+    # Multiply by r^l to get the homogeneous polynomial form, then divide by r^l in the final expression
+    Y_lm_cartesian = Y_lm_cartesian * r ** l
+
+    # Simplify again
+    Y_lm_cartesian = Y_lm_cartesian.simplify()
+    # Evaluate symbolic constants numerically
+
+
+
+    return Y_lm_real, Y_lm_cartesian
+
+
+def evaluate_cartesian_form(cartesian_form, x_val, y_val, z_val, method='sympy'):
+    """
+    Evaluate the Cartesian form of a spherical harmonic at a given (x, y, z) point.
+
+    Parameters:
+    cartesian_form: SymPy expression in terms of x, y, z, r.
+    x_val (float): x-coordinate.
+    y_val (float): y-coordinate.
+    z_val (float): z-coordinate.
+    method (str): 'sympy' for symbolic evaluation, 'numpy' for numerical evaluation.
+
+    Returns:
+    float: The value of the spherical harmonic at the given point.
+    """
+    # Compute r = sqrt(x^2 + y^2 + z^2)
+    r_val = np.sqrt(x_val ** 2 + y_val ** 2 + z_val ** 2)
+    # Define symbols
+    x, y, z, r = sp.symbols('x y z r')
+    if method == 'sympy':
+
+
+        # Substitute the values
+        value = cartesian_form.subs({x: x_val, y: y_val, z: z_val, r: r_val})
+
+        # Convert to numerical value
+        value = float(value.evalf())
+
+    elif method == 'numpy':
+        # Convert SymPy expression to a NumPy function
+        f = sp.lambdify((x, y, z, r), cartesian_form.evalf(), 'numpy')
+
+        # Evaluate using NumPy
+        value = f(x_val, y_val, z_val, r_val)
+
+    else:
+        raise ValueError("Method must be 'sympy' or 'numpy'")
+
+    return value
+
+
+# Main script to compute and evaluate spherical harmonics
+def compute_and_evaluate_spherical_harmonics(l, m, x_val, y_val, z_val):
+    """
+    Compute the Cartesian form of a spherical harmonic and evaluate it at (x, y, z).
+
+    Parameters:
+    l (int): Degree of the spherical harmonic.
+    m (int): Order of the spherical harmonic.
+    x_val (float): x-coordinate.
+    y_val (float): y-coordinate.
+    z_val (float): z-coordinate.
+
+    Returns:
+    None (prints the results).
+    """
+    # Compute the angular and Cartesian forms
+    angular_form, cartesian_form = convert_spherical_harmonic_to_cartesian(l, m)
+
+    # Print the forms
+    print(f"\nY_{l},{m}:")
+    print("Angular form:")
+    sp.pprint(angular_form)
+    print("Cartesian form:")
+    sp.pprint(cartesian_form)
+
+    # Evaluate using SymPy
+    # value_sympy = evaluate_cartesian_form(cartesian_form, x_val, y_val, z_val, method='sympy')
+    # print(f"\nValue at (x={x_val}, y={y_val}, z={z_val}) using SymPy: {value_sympy}")
+
+    # Evaluate using NumPy
+    value_numpy = evaluate_cartesian_form(cartesian_form, x_val, y_val, z_val, method='numpy')
+    print(f"Value at (x={x_val}, y={y_val}, z={z_val}) using NumPy: {value_numpy}")
+
+#
+# # Test the tool for l=2, m=-2 to 2 at (x, y, z) = (1, 2, 3)
+# x_val, y_val, z_val = 1.0, 2.0, 3.0
+# for m in range(-2, 3):
+#     compute_and_evaluate_spherical_harmonics(2, m, x_val, y_val, z_val)
+# a = evaluate_on_unit_sphere(2,-1, 1, 1)
+# print(a)
+
 if __name__ == '__main__':
     integrate_spherical_fun(1,2)
+
+
+
