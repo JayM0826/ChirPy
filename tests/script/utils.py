@@ -13,8 +13,11 @@ ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
 ORIGIN_ATOM_INDEX = 0
 # CUT_OFF = 2. # unit angstrom: 10**(-10) m
-CUT_OFF = 3.5  # unit angstrom: 10**(-10) m
+CUT_OFF = 5  # unit angstrom: 10**(-10) m
 SIGMA = 1
+L_MAX = 6
+LEBEDEV_ORDER = 131
+LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
@@ -91,7 +94,7 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
         )
         for rx, ry, rz, sigma, smooth_coeff
         in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
-        if (rx != 0 and ry != 0 and rz != 0) # ignore the origin atom
+        if not (rx == 0 and ry == 0 and rz == 0) # ignore the origin atom
     ]
 
     def combined_function(x, y, z):
@@ -100,7 +103,7 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
     return combined_function
 
 
-def cartesian_to_spherical(x, y, z, r):
+def cartesian_to_spherical(x, y, z, r=1):
     """
     Convert Cartesian coordinates (x, y, z) to spherical coordinates (theta, phi).
 
@@ -126,48 +129,79 @@ def cartesian_to_spherical(x, y, z, r):
 
     return theta, phi
 
+LEBEDEV_THETA, LEBEDEV_PHI = cartesian_to_spherical(*LEBEDEV_POINTS)
 
-def integrand(f_spherical, spherical_harmonics_Zlm_sph_version, r):
+def integrand(f_cartesion, spherical_harmonics_Zlm_sph_version, r):
     # order can be dynamic based on r, because when r is small, no need to sample too many points
-    order = 131
-    points, weights = scipy.integrate.lebedev_rule(order)
-    x, y, z = points * r  # scaled sample points
-    values = f_spherical(x, y, z) * spherical_harmonics_Zlm_sph_version(*cartesian_to_spherical(x, y, z, r))
-    surface_integral = np.sum(weights * values)
-    return r ** 2 * surface_integral * radial_basis_gn()
+    x, y, z = LEBEDEV_POINTS * r  # scaled sample points
+    values = f_cartesion(x, y, z) * spherical_harmonics_Zlm_sph_version(LEBEDEV_THETA, LEBEDEV_PHI)
+    surface_integral = np.sum(LEBEDEV_WEIGHTS * values)
+    return surface_integral * r**2 * radial_basis_gn()
 
 
-def integration_sph(density_fun, spherical_harmonics_Zlm_sph_version, r):
-    # simplify it
-    integral, _ = scipy.integrate.quad(partial(integrand, density_fun, spherical_harmonics_Zlm_sph_version) , 0, r)
-    # print(f"integration_sph_coefficient : Integral result: {integral}")
+def integration_sph(density_fun, real_spherical_harmonics, r):
+    integral, err = scipy.integrate.quad(partial(integrand, density_fun, real_spherical_harmonics), 0, r)
+    print(f"integration_sph_coefficient : Integral result: {integral}, error={err}")
     return integral
 
 
 def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF,
                                origin_index=ORIGIN_ATOM_INDEX):
-    # TODO use different origin, and only care about the neighbour, not including the origin atom
     relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     density_fun = gaussian_fun_3D(sigma_3D, relative_distances_3D, smooth_efficient)
-    l_max = 10
-    coeffs=[]
-    for l in np.arange(0, l_max + 1, dtype=int):
-        for m in np.arange(-l, l+1, dtype=int):
-            spherical_harmonics_Zlm_sph_version = evaluate_on_unit_sphere(l, m)
-            coeff = integration_sph(density_fun, spherical_harmonics_Zlm_sph_version, r_cutoff)
-            print(f"integration_sph_coefficient : coefficient for Y_{l}_{m}: {coeff}")
+    return density_fun
+
+
+def compute_sph_coefficients(density_fun, r_cutoff):
+    coeffs = []
+    for l in np.arange(0, L_MAX + 1, dtype=int):
+        for m in np.arange(-l, l + 1, dtype=int):
+            real_spherical_harmonics = Y_lm_real(l, m)
+            coeff = integration_sph(density_fun, real_spherical_harmonics, r_cutoff)
             coeffs.append(coeff)
-    return lambda x, y, z: density_fun(x, y, z)
+    return np.asarray(coeffs)
 
 
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv, smooth_efficient):
     atom_positions = atom_positions[:, 0:3]
-    # return trans_invariant_density_alt_3D(atom_positions, sigmas, xv, yv, zv)
-    return trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)(xv, yv, zv)
+    density_fun = trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)
+    print_format_coefficients(compute_sph_coefficients(density_fun, CUT_OFF))
+    return density_fun(xv, yv, zv)
 
 def radial_basis_gn():
     return 1
 
+
+def print_format_coefficients(coefficients):
+
+    print(300* "*")
+    print(f"{100 *'*'}COEFFICIENTS{140 *'*'}")
+    print(300 * "*")
+
+
+    # Format the array to 10 decimal places
+    coefficients = np.around(coefficients, decimals=10)
+
+    # Print the array with indentation to form a triangle
+    print("[")
+    start_idx = 0
+    max_width = L_MAX * 2 + 1  # Maximum width (for l=6, m=-6 to 6)
+    for l in range(L_MAX + 1):  # l from 0 to 6
+        # Number of elements in this row (2l+1)
+        row_length = 2 * l + 1
+        # Extract the elements for this row
+        row = coefficients[start_idx:start_idx + row_length]
+        # Calculate indentation to center the row
+        indent = (max_width - row_length) // 2
+        indent_str = "               " * indent
+        # Format the row
+        formatted_row = f"{l}:{indent_str}{',  '.join(f'{x:.10f}' for x in row)}"
+        print(f"{formatted_row},")
+
+        start_idx += row_length
+    print("]")
+    print(300* "*")
+    print(300 * "*")
 def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE,
                              origin_index=ORIGIN_ATOM_INDEX):
     """
@@ -275,29 +309,15 @@ def Y_lm_real(l, m):
         l (int): Degree of the spherical harmonic.
         m (int): Order of the spherical harmonic.
         Returns:
-        Znm, theta symbol, phi symbol
+        function: Znm(theta, phi)
         """
     theta_sym, phi_sym = sp.symbols('theta phi', real=True)
-    Y = Znm(l, m, theta_sym, phi_sym)
-    return Y, theta_sym, phi_sym
-
-
-def evaluate_on_unit_sphere(l, m):
-    """
-    Evaluate a spherical harmonic at a point (theta, phi) on the unit sphere.
-
-    Parameters:
-    l (int): Degree of the spherical harmonic.
-    m (int): Order of the spherical harmonic.
-    theta (float): Polar angle.
-    phi (float): Azimuthal angle.
-    Returns:
-    float: Value of the spherical harmonic.
-    """
-    Y_lm, theta_sym, phi_sym = Y_lm_real(l, m)
-    Y_lm = Y_lm.expand(func=True)
+    Y_lm = Znm(l, m, theta_sym, phi_sym).expand(func=True)
     f = sp.lambdify((theta_sym, phi_sym), Y_lm, 'numpy')
     return lambda theta, phi: f(theta, phi).real
+    # return Y, theta_sym, phi_sym
+
+
 
 
 def backwards_check(pho, l_max = 10):
@@ -305,10 +325,10 @@ def backwards_check(pho, l_max = 10):
     coeff = 1.
     for l in np.arange(0, l_max + 1, dtype=int):
         for m in np.arange(-l, l, dtype=int):
-            result += Y_lm_real(l, m)[0] * coeff
+            pass
+            # result += Y_lm_real(l, m)[0] * coeff
 
     if (pho == result):
         return True
     else:
         return False
-

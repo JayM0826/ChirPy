@@ -425,6 +425,24 @@ def compute_and_evaluate_spherical_harmonics(l, m, x_val, y_val, z_val):
 # a = evaluate_on_unit_sphere(2,-1, 1, 1)
 # print(a)
 
+
+
+def evaluate_on_unit_sphere(l, m):
+    """
+    Evaluate a spherical harmonic at a point (theta, phi) on the unit sphere.
+
+    Parameters:
+    l (int): Degree of the spherical harmonic.
+    m (int): Order of the spherical harmonic.
+    theta (float): Polar angle.
+    phi (float): Azimuthal angle.
+    Returns:
+    float: Value of the spherical harmonic.
+    """
+    Y_lm, theta_sym, phi_sym = Y_lm_real(l, m)
+    f = sp.lambdify((theta_sym, phi_sym), Y_lm, 'numpy')
+    return lambda theta, phi: f(theta, phi).real
+
 if __name__ == '__main__':
     integrate_spherical_fun(1,2)
 

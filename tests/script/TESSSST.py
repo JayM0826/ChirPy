@@ -67,6 +67,7 @@ print(70 * "*")
 print(70 * "*")
 
 system.print_info()
+print(system.data.shape)
 atom_positions = system.data[-1][:, 0:3]
 # density = utils.compute_whole_grid_density(atom_positions)
 frame_1 = system.data[0][:, 0:3]
