@@ -1,13 +1,16 @@
 import math as math
 from functools import partial
+from types import FunctionType
 
+# third-party module
 import numpy as np
 import plotly.graph_objects as go
 import scipy
 from sympy.functions.special.spherical_harmonics import Ynm, Ynm_c, Znm
-from sympy import Symbol, integrate
 import sympy as sp
+from scipy.special import sph_harm_y
 
+# **********************CONSTANT**************************************
 ONE_OVER_TWO_PI_POWER_1DIV2 = 1 / np.power(2 * np.pi, 0.5)
 ONE_OVER_TWO_PI_POWER_3DIV2 = np.power(ONE_OVER_TWO_PI_POWER_1DIV2, 3)
 NUMBER_PER_UNIT_DISTANCE = 5
@@ -18,6 +21,9 @@ SIGMA = 1
 L_MAX = 6
 LEBEDEV_ORDER = 131
 LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
+
+
+# **********************CONSTANT OVER*********************************
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, origin_index=ORIGIN_ATOM_INDEX, cutoff=CUT_OFF):
@@ -94,7 +100,7 @@ def gaussian_fun_3D(sigmas, relative_distances_3D, smooth_coefficient):
         )
         for rx, ry, rz, sigma, smooth_coeff
         in zip(relative_xs, relative_ys, relative_zs, sigmas, smooth_coefficient)
-        if not (rx == 0 and ry == 0 and rz == 0) # ignore the origin atom
+        if not (rx == 0 and ry == 0 and rz == 0)  # ignore the origin atom
     ]
 
     def combined_function(x, y, z):
@@ -129,25 +135,35 @@ def cartesian_to_spherical(x, y, z, r=1):
 
     return theta, phi
 
+
+def spherical_to_cartesian(theta, phi, r):
+    xyz = np.array([np.sin(theta) * np.cos(phi),
+                    np.sin(theta) * np.sin(phi),
+                    np.cos(theta)])
+    return np.abs(r) * xyz
+
+
 LEBEDEV_THETA, LEBEDEV_PHI = cartesian_to_spherical(*LEBEDEV_POINTS)
 
-def integrand(f_cartesion, spherical_harmonics_Zlm_sph_version, r):
+
+def integrand(f_cartesion, real_spherical_harmonics, r):
     # order can be dynamic based on r, because when r is small, no need to sample too many points
     x, y, z = LEBEDEV_POINTS * r  # scaled sample points
-    values = f_cartesion(x, y, z) * spherical_harmonics_Zlm_sph_version(LEBEDEV_THETA, LEBEDEV_PHI)
+    values = f_cartesion(x, y, z) * real_spherical_harmonics(LEBEDEV_THETA, LEBEDEV_PHI)
     surface_integral = np.sum(LEBEDEV_WEIGHTS * values)
-    return surface_integral * r**2 * radial_basis_gn()
+    return surface_integral * r ** 2 * radial_basis_gn()
 
 
 def integration_sph(density_fun, real_spherical_harmonics, r):
     integral, err = scipy.integrate.quad(partial(integrand, density_fun, real_spherical_harmonics), 0, r)
-    print(f"integration_sph_coefficient : Integral result: {integral}, error={err}")
+    # print(f"integration_sph_coefficient : Integral result: {integral}, error={err}")
     return integral
 
 
 def trans_invariant_density_3D(atom_positions, sigma_3D, smooth_efficient, r_cutoff=CUT_OFF,
                                origin_index=ORIGIN_ATOM_INDEX):
-    relative_distances_3D = atom_positions - atom_positions[origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    relative_distances_3D = atom_positions - atom_positions[
+        origin_index]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     density_fun = gaussian_fun_3D(sigma_3D, relative_distances_3D, smooth_efficient)
     return density_fun
 
@@ -162,22 +178,38 @@ def compute_sph_coefficients(density_fun, r_cutoff):
     return np.asarray(coeffs)
 
 
+def plot_LCAO(coefficients, l_max=L_MAX):
+    i = 0
+    theta, phi = theta_phi_meshgrid()
+
+    values = np.zeros(shape=theta.shape)
+    for l in np.arange(0, l_max + 1):
+        for m in np.arange(-l, l+1):
+            if coefficients[i] != 0.:
+                values += Y_lm_real(l, m)(theta, phi) * coefficients[i]
+            # plot_spherical_harmonics_for_scipy(l, m, coefficients[i])
+            i += 1
+
+    plot_LCAO_spherical_harmonics(values, *spherical_to_cartesian(theta, phi, values))
+
 def compute_whole_grid_density(atom_positions, sigmas, xv, yv, zv, smooth_efficient):
     atom_positions = atom_positions[:, 0:3]
     density_fun = trans_invariant_density_3D(atom_positions, sigmas, smooth_efficient)
-    print_format_coefficients(compute_sph_coefficients(density_fun, CUT_OFF))
+    coefficients = compute_sph_coefficients(density_fun, CUT_OFF)
+    plot_LCAO(coefficients)
+    print_format_coefficients(coefficients)
+
     return density_fun(xv, yv, zv)
+
 
 def radial_basis_gn():
     return 1
 
 
 def print_format_coefficients(coefficients):
-
-    print(300* "*")
-    print(f"{100 *'*'}COEFFICIENTS{140 *'*'}")
     print(300 * "*")
-
+    print(f"{100 * '*'}COEFFICIENTS{140 * '*'}")
+    print(300 * "*")
 
     # Format the array to 10 decimal places
     coefficients = np.around(coefficients, decimals=10)
@@ -200,8 +232,10 @@ def print_format_coefficients(coefficients):
 
         start_idx += row_length
     print("]")
-    print(300* "*")
     print(300 * "*")
+    print(300 * "*")
+
+
 def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance=NUMBER_PER_UNIT_DISTANCE,
                              origin_index=ORIGIN_ATOM_INDEX):
     """
@@ -309,7 +343,7 @@ def Y_lm_real(l, m):
         l (int): Degree of the spherical harmonic.
         m (int): Order of the spherical harmonic.
         Returns:
-        function: Znm(theta, phi)
+        function: Znm(theta[0,pi], phi[0,2pi])
         """
     theta_sym, phi_sym = sp.symbols('theta phi', real=True)
     Y_lm = Znm(l, m, theta_sym, phi_sym).expand(func=True)
@@ -318,9 +352,7 @@ def Y_lm_real(l, m):
     # return Y, theta_sym, phi_sym
 
 
-
-
-def backwards_check(pho, l_max = 10):
+def backwards_check(pho, l_max=10):
     result = 0
     coeff = 1.
     for l in np.arange(0, l_max + 1, dtype=int):
@@ -332,3 +364,123 @@ def backwards_check(pho, l_max = 10):
         return True
     else:
         return False
+
+
+def real_sph_harm(l, m, theta, phi):
+    """
+    # NB In SciPy's sph_harm_y function the azimuthal coordinate, theta,
+    # comes before the polar coordinate, phi.
+    theta = np.linspace(0, np.pi, 100)
+    phi = np.linspace(0, 2*np.pi, 100)
+    theta, phi = np.meshgrid(theta, phi)
+    """
+    if m == 0:
+        return sph_harm_y(l, 0, theta, phi).real
+    elif m > 0:
+        return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real  # Even
+    else:
+        return np.sqrt(2) * np.power(-1., m) * np.imag(sph_harm_y(l, -m, theta, phi))  # Odd
+    # Y = sph_harm_y(l, abs(m), theta, phi)
+    #
+    # # Linear combination of Y_l,m and Y_l,-m to create the real form.
+    # if m < 0:
+    #     Y = np.sqrt(2) * (-1.)**m * Y.imag
+    # elif m > 0:
+    #     Y = np.sqrt(2) * (-1.)**m * Y.real
+    # else:
+    #     Y = Y.real
+    # return Y
+
+
+def plot_spherical_harmonics_for_sympy(l, m, num=100):
+    """
+    l : [0, +oo]
+    m : [-l, l]
+      function: Znm(theta[0,pi], phi[0,2pi])
+    """
+    # Grids of polar and azimuthal angles
+    theta, phi= theta_phi_meshgrid(num)
+
+    Z_lm = Y_lm_real(l, m)
+    values = Z_lm(theta, phi)
+    if not isinstance(values, np.ndarray):
+        print("values is NOT a NumPy array")
+        values = np.full(theta.shape, values)
+
+    x, y, z = spherical_to_cartesian(theta, phi, values)
+
+    fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=values, colorscale='Viridis')])
+    fig.update_layout(
+        title=f"real spherical harmonics of sympy Y_{l}_{m}",
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z'
+        )
+    )
+    fig.show()
+
+def plot_LCAO_spherical_harmonics(values, xs, ys, zs):
+
+    fig = go.Figure(data=[go.Surface(x=xs, y=ys, z=zs, surfacecolor=values, colorscale='Viridis', hoverinfo="x+y+z")])
+    fig.update_layout(
+        title=f"linear combination of real spherical harmonics",
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z'
+        )
+    )
+    fig.show()
+
+
+def plot_spherical_harmonics_for_scipy(l, m, coefficient=1, num=100):
+    """
+    l : [0, +oo]
+    m : [-l, l]
+    ref: https://scipython.com/blog/visualizing-the-real-forms-of-the-spherical-harmonics/
+    """
+    theta,phi = theta_phi_meshgrid(num)
+
+    values = real_sph_harm(l, m, theta, phi) * coefficient
+    # values1 = Y_lm_real(l, m)(theta, phi)
+    x, y, z = spherical_to_cartesian(theta, phi, values)
+
+
+    fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=values, colorscale='Viridis')])
+    fig.update_layout(
+        title=f"real spherical harmonics of scipy Y_{l}_{m}",
+        scene=dict(
+            xaxis_title='X',
+            yaxis_title='Y',
+            zaxis_title='Z'
+        )
+    )
+    fig.show()
+
+
+def theta_phi_meshgrid(num=100):
+    # Grids of polar and azimuthal angles
+    theta = np.linspace(0, np.pi, num)
+    phi = np.linspace(0, 2 * np.pi, num)
+    # Create a 2-D meshgrid of (theta, phi) angles.
+    return np.meshgrid(theta, phi)
+#
+# for l in np.arange(0, 4):
+#     for m in np.arange(-l, l+1):
+#         plot_spherical_harmonics_for_sympy(l, m)
+#         # plot_spherical_harmonics_for_scipy(l, m)
+
+# x = 0.3466097
+# y = -0.1928484
+# z = 0.1096611
+# r = np.sqrt(x**2+y**2+z**2)
+#
+# theta, phi = cartesian_to_spherical(x, y, z, r)
+# Z_lm = Y_lm_real(1, 1)
+# values = Z_lm(theta, phi)
+# print(values)
+# print(real_sph_harm(1, 1, theta, phi))
+# def Y_0_0(a):
+#     return 5 # return a constant arbitrarily
+# print(Y_0_0(np.arange(0, 5))) # output: 5 not [5,5,5,5,5]
