@@ -27,7 +27,7 @@ def example_density():
                                  [2, 2, 2],
                                  [-1, -1, -1]])
     sigmas = np.array([2, 3, 4])
-    density_function_3D = utils.trans_invariant_density_3D(atom_3D_position, sigmas)
+    density_function_3D = utils.trans_invariant_density_fun(atom_3D_position, sigmas)
     # how to determine the upper bound and lower bound: 3-sigma rule
     N = len(atom_3D_position)
     bounds = utils.coupute_XYZ_bounds(atom_3D_position, sigmas)

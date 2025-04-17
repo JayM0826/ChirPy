@@ -59,8 +59,8 @@ CUBIC
 # R = 2.0
 # integral, _ = quad(integrand, 0, R)
 # print(f"体积分结果: {integral}")
-
-system = cp.trajectory.XYZ("tartrate.xyz").expand()
+obj = cp.trajectory.XYZ("/home/jim92/PycharmProjects/ChirPy/tests/tartrate.xyz")
+system = obj.expand()
 print(70 * "*")
 print(70 * "*")
 print(70 * "*")
