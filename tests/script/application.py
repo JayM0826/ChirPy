@@ -71,7 +71,7 @@ if __name__ == '__main__':
     utils_ext.print_Gauss()
     utils_ext.print_banner("Gauß  START")
     app = Application("tartrate.xyz")
-    # app.run()
+    app.run()
     app.exit()
     del app
     utils_ext.print_art_text("Gauß  REST")

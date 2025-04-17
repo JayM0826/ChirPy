@@ -12,12 +12,8 @@ from scipy.special import sph_harm_y
 # local module
 import utils_ext
 
+
 # **********************CONSTANT OVER*********************************
-
-
-
-
-
 
 
 def spherical_integral(f_cartesion, real_spherical_harmonics, config, r):
@@ -30,13 +26,15 @@ def spherical_integral(f_cartesion, real_spherical_harmonics, config, r):
 
 
 def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config):
-    integral, err = scipy.integrate.quad(partial(spherical_integral, density_fun, real_spherical_harmonics, config), 0, config.CUT_OFF)
+    integral, err = scipy.integrate.quad(partial(spherical_integral, density_fun, real_spherical_harmonics, config), 0,
+                                         config.CUT_OFF)
     # print(f"integration_sph_coefficient : Integral result: {integral}, error={err}")
     return integral
 
 
 def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
-    relative_distances = atom_positions - atom_positions[config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    relative_distances = atom_positions - atom_positions[
+        config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     # NB: r must be an array
     relative_xs = relative_distances[:, 0]
     relative_ys = relative_distances[:, 1]
@@ -51,8 +49,7 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
         if not (rx == 0 and ry == 0 and rz == 0)  # ignore the origin atom
     ]
 
-    return lambda x,y,z : np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
-
+    return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
 
 
 def compute_sph_coefficients(density_fun, config):
@@ -71,20 +68,17 @@ def plot_LCAO(coefficients, l_max, cutoff):
 
     values = np.zeros(shape=theta.shape)
     for l in np.arange(0, l_max + 1):
-        for m in np.arange(-l, l+1):
-            if coefficients[i] != 0.:
+        for m in np.arange(-l, l + 1):
+            if abs(coefficients[i]-0.) < 1e-10:
                 values += Y_lm_real(l, m)(theta, phi) * coefficients[i]
             # plot_spherical_harmonics_for_scipy(l, m, coefficients[i])
             i += 1
 
-    plot_LCAO_spherical_harmonics(values, *utils_ext.spherical_to_cartesian(theta, phi, values), cutoff)
+    plot_LCAO_spherical_harmonics(values, *utils_ext.unit_spherical_to_cartesian(theta, phi, values) * cutoff, cutoff)
+
 
 def radial_basis_gn():
     return 1
-
-
-
-
 
 
 def compute_whole_grid_distribution(trajectory, sigmas, config):
@@ -96,8 +90,11 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
     print(f"There will be {len(trajectory)} frames need to calculate...")
     # the grid shape should be the same for all the frames, otherwise we cannot add them up
     first_frame = trajectory[0][:, 0:3]
-    filtered_first_frame, _ = utils_ext.filter_atoms_within_cutoff(first_frame, config.ORIGIN_ATOM_INDEX, config.CUT_OFF)
-    xv, yv, zv, bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(filtered_first_frame, sigmas, config.NUMBER_PER_UNIT_DISTANCE, config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
+    filtered_first_frame, _ = utils_ext.filter_atoms_within_cutoff(first_frame, config.ORIGIN_ATOM_INDEX,
+                                                                   config.CUT_OFF)
+    xv, yv, zv, bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(filtered_first_frame, sigmas,
+                                                                           config.NUMBER_PER_UNIT_DISTANCE,
+                                                                           config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
     print(f"grid detail:shape={xv.shape} bounds={bounds}")
     total_density_result = np.zeros_like(xv)
     i = 0
@@ -109,7 +106,9 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # calculate the density of frame i
         # ****************************************************************
         print(f"Now start to calculate the density of frame {i}")
-        filtered_first_frame, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(atom_positions, config.ORIGIN_ATOM_INDEX, config.CUT_OFF)
+        filtered_first_frame, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(atom_positions,
+                                                                                         config.ORIGIN_ATOM_INDEX,
+                                                                                         config.CUT_OFF)
         density_fun = trans_invariant_density_fun(filtered_first_frame, config, smooth_coefficients)
         new_density_result = density_fun(xv, yv, zv)
         if not isinstance(new_density_result, np.ndarray):
@@ -121,12 +120,13 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
 
         total_density_result += new_density_result
         print(f"The calculation of the density of frame {i} is over")
-        print(f"So sum over all the density of frame, we got the distribution and the shape is {total_density_result.shape}")
-        print(f"Integration of density of frame all over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(total_density_result, R_z), R_y), R_x)}")
+        print(
+            f"So sum over all the density of frame, we got the distribution and the shape is {total_density_result.shape}")
+        print(
+            f"Integration of density of frame all over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(total_density_result, R_z), R_y), R_x)}")
         # ****************************************************************
         # calculate the density of frame i over
         # ****************************************************************
-
 
         # ****************************************************************
         # plot the linear combination of real spherical harmonics function
@@ -138,16 +138,11 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # ****************************************************************
         # ****************************************************************
 
+        # TODO it later
         # theta, phi = utils_ext.cartesian_to_spherical(xv, yv, zv)
         # backwards_check(new_density_result, coefficients, theta, phi, config.L_MAX)
 
     return total_density_result, R_x, R_y, R_z
-
-
-
-
-
-
 
 
 def Y_lm_real(l, m):
@@ -214,15 +209,17 @@ def plot_spherical_harmonics_for_sympy(l, m, CUT_OFF, num=100):
       function: Znm(theta[0,pi], phi[0,2pi])
     """
     # Grids of polar and azimuthal angles
-    theta, phi= utils_ext.theta_phi_meshgrid(num)
+    theta, phi = utils_ext.theta_phi_meshgrid(num)
 
     Z_lm = Y_lm_real(l, m)
     values = Z_lm(theta, phi)
     if not isinstance(values, np.ndarray):
         print("values is NOT a NumPy array")
         values = np.full(theta.shape, values)
+    # https://en.wikipedia.org/wiki/File:Rotating_spherical_harmonics.gif
+    # x, y, z = utils_ext.spherical_to_cartesian(theta, phi, CUT_OFF)
 
-    x, y, z = utils_ext.spherical_to_cartesian(theta, phi, values)
+    x, y, z = utils_ext.unit_spherical_to_cartesian(theta, phi, values) * CUT_OFF
 
     fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=values, colorscale='Viridis')])
     fig.update_layout(
@@ -239,9 +236,39 @@ def plot_spherical_harmonics_for_sympy(l, m, CUT_OFF, num=100):
     )
     fig.show()
 
-def plot_LCAO_spherical_harmonics(values, xs, ys, zs, CUT_OFF):
 
-    fig = go.Figure(data=[go.Surface(x=xs, y=ys, z=zs, surfacecolor=values, colorscale='Viridis', hoverinfo="x+y+z")])
+def plot_LCAO_spherical_harmonics(values, xs, ys, zs, CUT_OFF):
+    fig = go.Figure()
+    fig.add_trace(go.Surface(x=xs, y=ys, z=zs,
+                             surfacecolor=values,
+                             colorscale='Viridis',
+                             showscale=True,
+                             hoverinfo=None
+                             ))
+
+    # Add Scatter3d overlay for hover
+    # Flatten arrays for Scatter3d
+    x_flat = xs.flatten()
+    y_flat = ys.flatten()
+    z_flat = zs.flatten()
+    values_flat = values.flatten()
+
+    fig.add_trace(
+        go.Scatter3d(
+            x=x_flat,
+            y=y_flat,
+            z=z_flat,
+            mode='markers+text',
+            marker=dict(size=5, opacity=0.2),
+            hovertemplate=
+            'x: %{x:.2f}<br>' +
+            'y: %{y:.2f}<br>' +
+            'z: %{z:.2f}<br>' +
+            'LC_density(x,y,z): %{customdata:.2f}<extra></extra>',
+            customdata=values_flat  # Use customdata for f(x, y, z)
+        )
+    )
+
     fig.update_layout(
         title=f"linear combination of real spherical harmonics",
         scene=dict(
@@ -263,12 +290,11 @@ def plot_spherical_harmonics_for_scipy(l, m, coefficient, CUT_OFF, num=100):
     m : [-l, l]
     ref: https://scipython.com/blog/visualizing-the-real-forms-of-the-spherical-harmonics/
     """
-    theta,phi = utils_ext.theta_phi_meshgrid(num)
+    theta, phi = utils_ext.theta_phi_meshgrid(num)
 
     values = real_sph_harm(l, m, theta, phi) * coefficient
     # values1 = Y_lm_real(l, m)(theta, phi)
-    x, y, z = utils_ext.spherical_to_cartesian(theta, phi, values)
-
+    x, y, z = utils_ext.unit_spherical_to_cartesian(theta, phi, values) * CUT_OFF
 
     fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=values, colorscale='Viridis')])
     fig.update_layout(
@@ -287,12 +313,10 @@ def plot_spherical_harmonics_for_scipy(l, m, coefficient, CUT_OFF, num=100):
     )
     fig.show()
 
-
-
 # for l in np.arange(0, 4):
 #     for m in np.arange(-l, l+1):
-#         plot_spherical_harmonics_for_sympy(l, m)
-        # plot_spherical_harmonics_for_scipy(l, m)
+#         plot_spherical_harmonics_for_sympy(l, m, 5)
+#         plot_spherical_harmonics_for_scipy(l, m,  1, 5)
 
 # x = 0.3466097
 # y = -0.1928484

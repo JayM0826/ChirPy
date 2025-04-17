@@ -71,7 +71,12 @@ def cartesian_to_spherical(x, y, z, r=1):
     return theta, phi
 
 
-def spherical_to_cartesian(theta, phi, r):
+def unit_spherical_to_cartesian(theta, phi, r):
+    """
+    r: real spherical harmonics value on (theta, phi)
+    return the x,y,z based on the unit sphere. If it needs to be scaled, multiply the specific radius.
+     It should not change the value because real spherical harmonics fun is independent of radius.
+    """
     xyz = np.array([np.sin(theta) * np.cos(phi),
                     np.sin(theta) * np.sin(phi),
                     np.cos(theta)])
@@ -214,6 +219,9 @@ def plot_iosfurface(xv, yv, zv, values):
 
 
 def theta_phi_meshgrid(num=100):
+    """
+    num: how many grid points per pi radian
+    """
     # Grids of polar and azimuthal angles
     theta = np.linspace(0, np.pi, num)
     phi = np.linspace(0, 2 * np.pi, 2 * num)
@@ -234,14 +242,14 @@ def print_banner(str):
     # ASCII title
     banner = pyfiglet.figlet_format(str)
 
-    # 启动信息
+
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     python_version = platform.python_version()
     system_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
     # cuda_status = "Available ✅" if torch.cuda.is_available() else "Not Available ❌"
     # device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A"
 
-    # 打印启动信息
+
     print(banner)
     print(f"{'=' * 60}")
     print(f"{Style.BRIGHT}{Fore.YELLOW}CHIRPY SIMULATION FRAMEWORK {chirpy.__version__}")
@@ -279,7 +287,7 @@ def print_Gauss(path='Gauss.jpg', max_width=70):
     w, h = img.size
     aspect_ratio = h / w
     new_w = min(w, max_width)
-    new_h = int(new_w * aspect_ratio * 0.7)  # 字符高度约为宽度一半
+    new_h = int(new_w * aspect_ratio * 0.7)
     img = img.resize((new_w, new_h))
 
     for y in range(new_h):
