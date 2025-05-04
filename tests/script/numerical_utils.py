@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import scipy
 from sympy.functions.special.spherical_harmonics import Ynm, Ynm_c, Znm
 import sympy as sp
-from scipy.special import sph_harm_y
+from scipy.special import sph_harm_y,sph_harm
 
 # local module
 import utils_ext
@@ -56,7 +56,10 @@ def compute_sph_coefficients(density_fun, config):
     coeffs = []
     for l in np.arange(0, config.L_MAX + 1, dtype=int):
         for m in np.arange(-l, l + 1, dtype=int):
-            real_spherical_harmonics = Y_lm_real(l, m)
+            # real_spherical_harmonics = Y_lm_real_scipy1(l, m)
+            real_spherical_harmonics = Y_lm_real_sympy(l, m)
+
+            # real_spherical_harmonics()
             coeff = project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config)
             coeffs.append(coeff)
     return np.asarray(coeffs)
@@ -69,8 +72,8 @@ def plot_LCAO(coefficients, l_max, cutoff):
     values = np.zeros(shape=theta.shape)
     for l in np.arange(0, l_max + 1):
         for m in np.arange(-l, l + 1):
-            if abs(coefficients[i]-0.) < 1e-10:
-                values += Y_lm_real(l, m)(theta, phi) * coefficients[i]
+            if abs(coefficients[i]) > 1e-10:
+                values += Y_lm_real_sympy(l, m)(theta, phi) * coefficients[i]
             # plot_spherical_harmonics_for_scipy(l, m, coefficients[i])
             i += 1
 
@@ -145,7 +148,24 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
     return total_density_result, R_x, R_y, R_z
 
 
-def Y_lm_real(l, m):
+
+
+def backwards_check(density_result, coefficients, theta, phi, l_max):
+    result = np.zeros_like(density_result)
+    i = 0
+    for l in np.arange(0, l_max + 1, dtype=int):
+        for m in np.arange(-l, l + 1, dtype=int):
+            result += Y_lm_real_sympy(l, m)(theta, phi) * coefficients[i]
+            i += 1
+
+    result_ = np.allclose(density_result, result, rtol=1e-2, atol=1e-2)
+    print(f"backwards_check is {result_}")
+
+    diff_norm = np.linalg.norm(density_result - result)
+    print(f"Norm of difference: {diff_norm}")
+
+
+def Y_lm_real_sympy(l, m):
     """
         build real spherical harmonics
         Parameters:
@@ -160,29 +180,105 @@ def Y_lm_real(l, m):
     return lambda theta, phi: f(theta, phi).real
     # return Y, theta_sym, phi_sym
 
-
-def backwards_check(density_result, coefficients, theta, phi, l_max):
-    result = np.zeros_like(density_result)
-    i = 0
-    for l in np.arange(0, l_max + 1, dtype=int):
-        for m in np.arange(-l, l + 1, dtype=int):
-            result += Y_lm_real(l, m)(theta, phi) * coefficients[i]
-            i += 1
-
-    result_ = np.allclose(density_result, result, rtol=1e-2, atol=1e-2)
-    print(f"backwards_check is {result_}")
-
-    diff_norm = np.linalg.norm(density_result - result)
-    print(f"Norm of difference: {diff_norm}")
-
-
-def real_sph_harm(l, m, theta, phi):
+def Y_lm_real_scipy1(l, m):
     """
-    # NB In SciPy's sph_harm_y function the azimuthal coordinate, theta,
-    # comes before the polar coordinate, phi.
+    In SciPy sph_harm, the order is :
+        m,
+        l,
+        phi : array_like
+           Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        theta : array_like
+           Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
+
+    -------------------below is important---------------------------
+    the order and definition of parameters are the same as sympy
+    # In SciPy's sph_harm_y(here used)
+        the order is :
+        l,
+        m,
+        theta : ArrayLike[float]
+            Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        phi : ArrayLike[float]
+            Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
     theta = np.linspace(0, np.pi, 100)
     phi = np.linspace(0, 2*np.pi, 100)
     theta, phi = np.meshgrid(theta, phi)
+
+    Spherical harmonics. They are defined as
+
+    .. math::
+
+        Y_n^m(\theta,\phi) = \sqrt{\frac{2 n + 1}{4 \pi} \frac{(n - m)!}{(n + m)!}}
+            P_n^m(\cos(\theta)) e^{i m \phi}
+
+    where :math:`P_n^m` are the (unnormalized) associated Legendre polynomials.
+
+    Note that SciPy's spherical harmonics include the Condon-Shortley
+    phase [2]_ because it is part of `sph_legendre_p`.
+
+
+
+
+    If you need to derive formulas (for example, manually expanding a spherical wave), use sympy's Znm.
+    If you need to perform numerical computations (such as plotting molecular orbitals or doing acoustic simulations),
+    use the scipy version (the one that includes the (−1^m) factor!).
+    """
+    def fun(theta, phi):
+
+        if m == 0:
+            return sph_harm_y(l, 0, theta, phi).real
+        elif m > 0:
+            return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real  # Even
+        else:
+            return np.sqrt(2) * np.power(-1., m) * np.imag(sph_harm_y(l, -m, theta, phi))  # Odd
+    return fun
+
+def Y_lm_real_scipy(l, m, theta, phi):
+    """
+    In SciPy sph_harm, the order is :
+        m,
+        l,
+        phi : array_like
+           Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        theta : array_like
+           Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
+
+    -------------------below is important---------------------------
+    the order and definition of parameters are the same as sympy
+    # In SciPy's sph_harm_y(here used)
+        the order is :
+        l,
+        m,
+        theta : ArrayLike[float]
+            Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        phi : ArrayLike[float]
+            Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
+    theta = np.linspace(0, np.pi, 100)
+    phi = np.linspace(0, 2*np.pi, 100)
+    theta, phi = np.meshgrid(theta, phi)
+
+    Spherical harmonics. They are defined as
+
+    .. math::
+
+        Y_n^m(\theta,\phi) = \sqrt{\frac{2 n + 1}{4 \pi} \frac{(n - m)!}{(n + m)!}}
+            P_n^m(\cos(\theta)) e^{i m \phi}
+
+    where :math:`P_n^m` are the (unnormalized) associated Legendre polynomials.
+
+    Note that SciPy's spherical harmonics include the Condon-Shortley
+    phase [2]_ because it is part of `sph_legendre_p`.
+
+
+
+
+    f you need to derive formulas (for example, manually expanding a spherical wave), use sympy's Znm.
+    If you need to perform numerical computations (such as plotting molecular orbitals or doing acoustic simulations),
+    use the scipy version (the one that includes the (−1^m) factor!).
     """
     if m == 0:
         return sph_harm_y(l, 0, theta, phi).real
@@ -211,7 +307,7 @@ def plot_spherical_harmonics_for_sympy(l, m, CUT_OFF, num=100):
     # Grids of polar and azimuthal angles
     theta, phi = utils_ext.theta_phi_meshgrid(num)
 
-    Z_lm = Y_lm_real(l, m)
+    Z_lm = Y_lm_real_sympy(l, m)
     values = Z_lm(theta, phi)
     if not isinstance(values, np.ndarray):
         print("values is NOT a NumPy array")
@@ -292,7 +388,7 @@ def plot_spherical_harmonics_for_scipy(l, m, coefficient, CUT_OFF, num=100):
     """
     theta, phi = utils_ext.theta_phi_meshgrid(num)
 
-    values = real_sph_harm(l, m, theta, phi) * coefficient
+    values = Y_lm_real_scipy(l, m, theta, phi) * coefficient
     # values1 = Y_lm_real(l, m)(theta, phi)
     x, y, z = utils_ext.unit_spherical_to_cartesian(theta, phi, values) * CUT_OFF
 

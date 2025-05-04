@@ -452,7 +452,7 @@ import chirpy as cp
 import numpy as np
 from chirpy.classes.volume import ScalarField
 
-import utils as utils
+import numerical_utils as utils
 
 # density_data = soap_3d.example_density()
 #
@@ -632,3 +632,7 @@ print(scalar_field.integral() / scalar_field.voxel)
 # f_norm = (1 / ((2 * pi)**(3/2) * sigma_x * sigma_y * sigma_z)) * exp(-((x - mu_x)**2 / (2 * sigma_x**2) + (y - mu_y)**2 / (2 * sigma_y**2) + (z - mu_z)**2 / (2 * sigma_z**2)))
 # F_x_norm = integrate(f_norm, x)
 # print(F_x_norm)
+import numpy as np
+
+
+

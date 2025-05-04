@@ -259,7 +259,7 @@ def print_banner(str):
     # print(f"CUDA Support:   {cuda_status}")
     # print(f"GPU Device:     {device_name}")
     print(f"{'=' * 60}")
-    print(f"{Fore.BLACK}")
+    print(f"{Fore.WHITE}")
     print()
 
 
@@ -283,7 +283,7 @@ def print_Gauss(path='Gauss.jpg', max_width=70):
     img = Image.open(path)
     img = img.convert("RGB")
 
-    # 缩小图像宽度，保持终端友好
+
     w, h = img.size
     aspect_ratio = h / w
     new_w = min(w, max_width)
@@ -295,3 +295,35 @@ def print_Gauss(path='Gauss.jpg', max_width=70):
             r, g, b = img.getpixel((x, y))
             print(rgb_to_ansi(r, g, b), end="")
         print()
+
+
+def l_m_pairs(l_max_included):
+    """
+    generate (l, m) list of spherical harmonics
+    """
+    return [(l, m) for l in range(l_max_included) for m in range(-l, l + 1)]
+
+def n_l_m_pairs(n_max_included):
+    """
+    generate (n, l, m) list of spherical harmonics
+    """
+    return [(n, l, m) for n in range(1, n_max_included + 1) for l in range(n) for m in range(-l, l + 1)]
+
+
+def compute_cos_sin_angle_multiples(cos_phi, sin_phi, max_angular):
+    """
+    useful for computing harmonics, especially in associated Legendre polynomial
+    """
+    cos_sin_m_phi = np.zeros((max_angular + 1, 2))  # Each row: [cos(mφ), sin(mφ)]
+
+    for m in range(max_angular + 1):
+        if m == 0:
+            cos_sin_m_phi[m] = [1.0, 0.0]
+        elif m == 1:
+            cos_sin_m_phi[m] = [-cos_phi, -sin_phi]
+        else:
+            cos_sin_m_phi[m] = (
+                    -2.0 * cos_phi * cos_sin_m_phi[m - 1] - cos_sin_m_phi[m - 2]
+            )
+
+    return cos_sin_m_phi

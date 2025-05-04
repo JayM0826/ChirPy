@@ -7,7 +7,9 @@ import numpy as np
 
 
 
-import utils as utils
+import numerical_utils as num_utils
+import analytical_utils as ana_utils
+
 import configuration
 import utils_ext
 from chirpy.classes.volume import ScalarField
@@ -21,7 +23,7 @@ class Application:
         self.filepath = utils_ext.get_relative_path(self.config.BASE_PATH, filename).as_posix()
 
 
-    def run(self):
+    def run_numerically(self):
         system = cp.trajectory.XYZ(self.filepath).expand()
         print(70 * "*")
         print(70 * "*")
@@ -30,13 +32,11 @@ class Application:
 
         system.print_info()
         print(system.data.shape)
-        atom_positions = system.data[-1][:, 0:3]
-        # density = utils.compute_whole_grid_density(atom_positions)
         frame_1 = system.data[0][:, 0:3]
 
         sigmas = utils_ext.get_sigmas(frame_1)
         self.config.SIGMAS = sigmas
-        distribution, R_x, R_y, R_z = utils.compute_whole_grid_distribution(system.data, sigmas, self.config)
+        distribution, R_x, R_y, R_z = num_utils.compute_whole_grid_distribution(system.data, sigmas, self.config)
         print(f"x step size:{R_x[1] - R_x[0]}, len of R_x={len(R_x)}, and result = {len(R_x) * (R_x[1] - R_x[0])}")
         print(f"y step size:{R_y[1] - R_y[0]}, len of R_y={len(R_y)}, and result = {len(R_y) * (R_y[1] - R_y[0])}")
         print(f"z step size:{R_z[1] - R_z[0]}, len of R_z={len(R_z)}, and result = {len(R_z) * (R_z[1] - R_z[0])}")
@@ -66,14 +66,32 @@ class Application:
             delattr(self, attr)
         del self
 
+    def run_analytically(self):
+        system = cp.trajectory.XYZ(self.filepath).expand()
+        print(70 * "*")
+        print(70 * "*")
+        print(70 * "*")
+        print(70 * "*")
+
+        system.print_info()
+        print(system.data.shape)
+
+        frame_1 = system.data[0][:, 0:3]
+        sigmas = utils_ext.get_sigmas(frame_1)
+        self.config.SIGMAS = sigmas
+        coefficients = ana_utils.compute_coefficients(system.data, sigmas, self.config)
+        print(coefficients)
 
 if __name__ == '__main__':
     utils_ext.print_Gauss()
     utils_ext.print_banner("Gauß  START")
     app = Application("tartrate.xyz")
-    app.run()
+    # app.run_numerically()
+
+    app.run_analytically()
     app.exit()
     del app
-    utils_ext.print_art_text("Gauß  REST")
+
+
 
     
