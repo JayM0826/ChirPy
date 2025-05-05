@@ -28,7 +28,7 @@ def compute_coefficients(atom_positions, sigmas, config:Configration):
         if idx != config.ORIGIN_ATOM_INDEX: # exclude the origin atom
             for n, l, m in n_l_m_pairs(config.N_MAX):
                 coeff = coefficient(origin_atom_position, atom_position - origin_atom_position, 0.5 * (sigmas[idx - 1] ** -2), n, l, m, config.L_MAX, config.SAMPLE_POINTS_NUM)
-                coefficients[n - 1, l, m + config.L_MAX] += coeff
+                coefficients[n - 1, l, m + config.L_MAX] += coeff # shifting m by config.L_MAX to store them
 
     return coefficients
 

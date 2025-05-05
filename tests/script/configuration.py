@@ -7,8 +7,6 @@ import utils_ext
 from pathlib import Path
 
 
-# 获取项目根目录（假设脚本在项目内的某个子目录）
-
 
 @dataclass
 class Configration:
@@ -34,11 +32,7 @@ class Configration:
     LEBEDEV_ORDER: int = 131
     LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
     LEBEDEV_THETA, LEBEDEV_PHI = utils_ext.cartesian_to_spherical(*LEBEDEV_POINTS)
-    SAMPLE_POINTS_NUM = 20 # for numerical radial basis
+    SAMPLE_POINTS_NUM = N_MAX # for numerical radial basis
     BASE_PATH = Path(__file__).parent
 
-
-
-con = Configration()
-print(con.BASE_PATH)
 
