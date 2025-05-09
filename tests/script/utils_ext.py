@@ -52,7 +52,7 @@ def cartesian_to_spherical(x, y, z, r=1):
     x (float or np.ndarray): x-coordinate(s).
     y (float or np.ndarray): y-coordinate(s).
     z (float or np.ndarray): z-coordinate(s).
-
+    r:=norm(x, y, z), default 1(unit sphere)
     Returns:
     tuple: (theta, phi)
         - theta (float or np.ndarray): Polar angle in [0, pi].

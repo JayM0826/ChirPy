@@ -32,7 +32,9 @@ class Configration:
     LEBEDEV_ORDER: int = 131
     LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
     LEBEDEV_THETA, LEBEDEV_PHI = utils_ext.cartesian_to_spherical(*LEBEDEV_POINTS)
-    SAMPLE_POINTS_NUM = N_MAX # for numerical radial basis
+    DVR_BASIS_NUM = N_MAX # for numerical radial basis
+    # Minimal value which can be evaluated with the spherical bessel function
+    SPHERICAL_BESSEL_FUNCTION_FTOL = 1e-5
     BASE_PATH = Path(__file__).parent
 
 
