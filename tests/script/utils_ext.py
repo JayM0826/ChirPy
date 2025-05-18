@@ -14,7 +14,15 @@ import time
 from PIL import Image
 
 
-def print_format_coefficients(coefficients, l_max):
+def print_format_nlm_coefficients(coefficients, n_max,  l_max):
+    for n in range(n_max):
+        print(f"{100 * '*'}n={n}: COEFFICIENTS{140 * '*'}")
+        index_start = n * (l_max ** 2)
+        index_end = (n + 1) * (l_max ** 2)
+        print_format_lm_coefficients(coefficients[index_start:index_end], l_max)
+
+
+def print_format_lm_coefficients(coefficients, l_max):
     print(300 * "*")
     print(f"{100 * '*'}COEFFICIENTS{140 * '*'}")
     print(300 * "*")
@@ -25,8 +33,8 @@ def print_format_coefficients(coefficients, l_max):
     # Print the array with indentation to form a triangle
     print("[")
     start_idx = 0
-    max_width = l_max * 2 + 1  # Maximum width (e.g., l=6, m=-6 to 6)
-    for l in range(l_max + 1):
+    max_width = (l_max - 1) * 2 + 1  # Maximum width (e.g., l=6, m=-6 to 6)
+    for l in range(l_max):
         # Number of elements in this row (2l+1)
         row_length = 2 * l + 1
         # Extract the elements for this row
@@ -297,17 +305,20 @@ def print_Gauss(path='Gauss.jpg', max_width=70):
         print()
 
 
-def l_m_pairs(l_max_included):
+def l_m_pairs(l_max):
     """
     generate (l, m) list of spherical harmonics
     """
-    return [(l, m) for l in range(l_max_included) for m in range(-l, l + 1)]
+    return [(l, m) for l in range(l_max) for m in range(-l, l + 1)]
 
-def n_l_m_pairs(n_max_included):
+def n_l_m_pairs(n_max):
     """
+    Note that here the relation between n and (l,m) is different from quantum mechanics.
+    The quantum num(n,l,m) for  quantum mechanics have physical meaning but here is just as index of basis.
+    Maybe this method should be deleted!!!
     generate (n, l, m) list of spherical harmonics
     """
-    return [(n, l, m) for n in range(1, n_max_included + 1) for l in range(n) for m in range(-l, l + 1)]
+    return [(n, l, m) for n in range(1, n_max) for l in range(n) for m in range(-l, l + 1)]
 
 
 def compute_cos_sin_angle_multiples(cos_phi, sin_phi, max_angular):

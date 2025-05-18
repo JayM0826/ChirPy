@@ -7,26 +7,42 @@ import plotly.graph_objects as go
 import scipy
 from sympy.functions.special.spherical_harmonics import Ynm, Ynm_c, Znm
 import sympy as sp
-from scipy.special import sph_harm_y,sph_harm
+from scipy.special import eval_legendre, roots_legendre, sph_harm_y
+
 
 # local module
 import utils_ext
+from tests.script.configuration import Configration
+from tests.script.utils_ext import l_m_pairs
 
 
-# **********************CONSTANT OVER*********************************
-
-
-def spherical_integral(f_cartesion, real_spherical_harmonics, config, r):
+def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configration, n, r):
     # order can be dynamic based on r, because when r is small, no need to sample too many points
     x, y, z = config.LEBEDEV_POINTS * r  # scaled sample points
     values = f_cartesion(x, y, z) * real_spherical_harmonics(config.LEBEDEV_THETA, config.LEBEDEV_PHI)
     surface_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
-    # TODO  * radial_basis_gn()
-    return surface_integral * r ** 2
+    result = dvr_basis_function(n, r, config.N_MAX)
+    return surface_integral * r ** 2 * result
 
 
-def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config):
-    integral, err = scipy.integrate.quad(partial(spherical_integral, density_fun, real_spherical_harmonics, config), 0,
+# Orthonormal Legendre polynomial function on [-1, 1]
+def phi_n(n, x):
+    weight_func = 1 # Polynomial dependent, for definition, see Eq. 2.1. in Light, J. C., & Carrington, T. (2007). Discrete-Variable Representations and their Utilization (pp. 263–310). John Wiley & Sons, Ltd. https://doi.org/10.1002/9780470141731.ch4
+    norm = np.sqrt((2 * n + 1) / 2)
+    return norm * eval_legendre(n, x) * np.sqrt(weight_func)
+
+# Construct DVR basis function ψ_j(x)
+def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
+    x_grid, w = roots_legendre(LEGENDRE_ORDER_NUM)
+    root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
+    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(w[j])
+
+
+def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config, n):
+    """
+    the basis must be orthogonal
+    """
+    integral, err = scipy.integrate.quad(partial(spherical_integral, density_fun, real_spherical_harmonics, config, n), 0,
                                          config.CUT_OFF)
     # print(f"integration_sph_coefficient : Integral result: {integral}, error={err}")
     return integral
@@ -52,16 +68,16 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
     return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
 
 
-def compute_sph_coefficients(density_fun, config):
+def compute_sph_coefficients(density_fun, config:Configration):
     coeffs = []
-    for l in np.arange(0, config.L_MAX + 1, dtype=int):
-        for m in np.arange(-l, l + 1, dtype=int):
-            # real_spherical_harmonics = Y_lm_real_scipy1(l, m)
-            real_spherical_harmonics = Y_lm_real_sympy(l, m)
+    for n in range(config.N_MAX):
+        for l, m in l_m_pairs(config.L_MAX):
+                real_spherical_harmonics = Y_lm_real_scipy1(l, m)
+                # real_spherical_harmonics = Y_lm_real_sympy(l, m)
 
-            # real_spherical_harmonics()
-            coeff = project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config)
-            coeffs.append(coeff)
+                # real_spherical_harmonics()
+                coeff = project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config, n)
+                coeffs.append(coeff)
     return np.asarray(coeffs)
 
 
@@ -135,8 +151,9 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # plot the linear combination of real spherical harmonics function
         # ****************************************************************
         coefficients = compute_sph_coefficients(density_fun, config)
-        utils_ext.print_format_coefficients(coefficients, config.L_MAX)
-        plot_LCAO(coefficients, config.L_MAX, config.CUT_OFF)
+        # print(coefficients)
+        utils_ext.print_format_nlm_coefficients(coefficients, config.N_MAX, config.L_MAX)
+        # plot_LCAO(coefficients, config.L_MAX, config.CUT_OFF)
         # ****************************************************************
         # ****************************************************************
         # ****************************************************************
@@ -145,7 +162,7 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # theta, phi = utils_ext.cartesian_to_spherical(xv, yv, zv)
         # backwards_check(new_density_result, coefficients, theta, phi, config.L_MAX)
 
-    return total_density_result, R_x, R_y, R_z
+    return total_density_result, R_x, R_y, R_z, coefficients
 
 
 

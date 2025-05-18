@@ -27,8 +27,8 @@ class Configration:
     ORIGIN_ATOM_INDEX: int = 0
     # CUT_OFF = 2. # unit angstrom: 10**(-10) m
     CUT_OFF: float = 5.  # unit angstrom: 10**(-10) m
-    N_MAX: int = 7 # n = 1,2,3,4,5,6,7
-    L_MAX: int = N_MAX - 1 # l=0,1,2,3,4,5,6
+    N_MAX: int = 7 # n = 0,1,2,3,4,5,6, base 0, it is different from the quantum mechanics num, here it does not have physical meaning.
+    L_MAX: int = N_MAX - 1 # l=0,1,2,3,4,5, here L can be larger than N_MAX, because N_MAX is not the quantum principle num as before. but here as a convention, L_MAX=N_MAX-1
     LEBEDEV_ORDER: int = 131
     LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
     LEBEDEV_THETA, LEBEDEV_PHI = utils_ext.cartesian_to_spherical(*LEBEDEV_POINTS)

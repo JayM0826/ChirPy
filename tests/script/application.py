@@ -36,7 +36,7 @@ class Application:
 
         sigmas = utils_ext.get_sigmas(frame_1)
         self.config.SIGMAS = sigmas
-        distribution, R_x, R_y, R_z = num_utils.compute_whole_grid_distribution(system.data, sigmas, self.config)
+        distribution, R_x, R_y, R_z, coefficients = num_utils.compute_whole_grid_distribution(system.data, sigmas, self.config)
         print(f"x step size:{R_x[1] - R_x[0]}, len of R_x={len(R_x)}, and result = {len(R_x) * (R_x[1] - R_x[0])}")
         print(f"y step size:{R_y[1] - R_y[0]}, len of R_y={len(R_y)}, and result = {len(R_y) * (R_y[1] - R_y[0])}")
         print(f"z step size:{R_z[1] - R_z[0]}, len of R_z={len(R_z)}, and result = {len(R_z) * (R_z[1] - R_z[0])}")
@@ -60,6 +60,7 @@ class Application:
         print(scalar_field.integral(volume_unit='aa**3'))
         print(scalar_field.voxel)
         print(scalar_field.integral() / scalar_field.voxel)
+        return coefficients
 
     def exit(self):
         for attr in list(self.__dict__):
@@ -80,15 +81,18 @@ class Application:
         sigmas = utils_ext.get_sigmas(frame_1)
         self.config.SIGMAS = sigmas
         coefficients = ana_utils.compute_coefficients(system.data, sigmas, self.config)
-        print(coefficients)
+        utils_ext.print_format_nlm_coefficients(coefficients, self.config.N_MAX, self.config.L_MAX)
+        return coefficients
 
 if __name__ == '__main__':
     utils_ext.print_Gauss()
     utils_ext.print_banner("Gauß  START")
     app = Application("tartrate.xyz")
-    # app.run_numerically()
+    coeff1 = app.run_numerically()
 
-    app.run_analytically()
+    coeff2 = app.run_analytically()
+
+    assert np.allclose(coeff2, coeff1, rtol=0.01, atol=0.01)
     app.exit()
     del app
 
