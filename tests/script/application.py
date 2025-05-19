@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     coeff2 = app.run_analytically()
 
-    assert np.allclose(coeff2, coeff1, rtol=0.01, atol=0.01)
+    assert np.allclose(coeff2, coeff1, rtol=0.01, atol=0.01), "failure"
     app.exit()
     del app
 

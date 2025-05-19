@@ -12,6 +12,8 @@ import platform
 from colorama import Fore, Style, init
 import time
 from PIL import Image
+import warnings
+import functools
 
 
 def print_format_nlm_coefficients(coefficients, n_max,  l_max):
@@ -338,3 +340,17 @@ def compute_cos_sin_angle_multiples(cos_phi, sin_phi, max_angular):
             )
 
     return cos_sin_m_phi
+
+
+
+
+def deprecated(reason):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapped(*args, **kwargs):
+            warnings.warn(f"{func.__name__} is deprecated: {reason}",
+                          category=DeprecationWarning,
+                          stacklevel=2)
+            return func(*args, **kwargs)
+        return wrapped
+    return decorator

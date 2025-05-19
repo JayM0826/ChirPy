@@ -1,17 +1,20 @@
 import numpy as np
 from scipy.special import lpmv, gamma, hyp1f1, spherical_in, eval_legendre, roots_legendre
-from sympy.core.numbers import pi
+from numpy import pi
 from sympy.functions.combinatorial.factorials import factorial
-from sympy.functions.elementary.trigonometric import sin, cos
-
+from numpy import sin, cos
 from scipy.integrate import quad
 
 
+from math import sqrt
+
+
 from tests.script.configuration import Configration
+from tests.script.numerical_utils import Y_lm_real_scipy
 from tests.script.utils_ext import cartesian_to_spherical, l_m_pairs
 
 # *********CONSTANTS USED*************************
-SQRT_2=np.sqrt(2)
+SQRT_2=sqrt(2)
 PI_POW_3_DIV_2 = np.pi ** (1.5)
 # ************************************************
 
@@ -28,7 +31,7 @@ def phi_n(n, x):
 # Construct DVR basis function ψ_j(x)
 def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
-    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(w[j])
+    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 
 def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_NUM):
@@ -73,7 +76,7 @@ def compute_coefficients(atom_positions, sigmas, config:Configration):
 
     return np.array(full_coeff, dtype=np.float64)
 
-if __name__ == '__main__':
+if __name__ == '__main__1':
 
     import matplotlib.pyplot as plt
     # Number of DVR points / polynomial order
@@ -233,8 +236,6 @@ def I_nl_ij_gto(n, l, r_ij, r_cutoff, n_max):
     # confluent_hypergeom = confluent_hypergeom_scaled * np.exp(hyper_arg)
     return prefactor * (numerator_gamma / denominator_gamma) * a_l * rij_l * ab_term * confluent_hypergeom
 
-
-
 def c_ij_nlm_gto(n, l, m, r_ij_vec, r_cutoff, n_max):
     a = 0.5 * (n + l + 3)
     r_ij = np.linalg.norm(r_ij_vec)
@@ -246,98 +247,21 @@ def c_ij_nlm_gto(n, l, m, r_ij_vec, r_cutoff, n_max):
     theta, phi = cartesian_to_spherical(*r_ij_vec, r_ij)
     return prefactor * Y_bar_l_m(l, m, theta, phi)
 
-
-
-
-
-
-
-
 def coefficient(origin_atom, r_ij, one_over_2_sigma_squared, n, l, m, r_cutoff, DVR_BASIS_NUM):
-    theta, phi,  = cartesian_to_spherical(*r_ij, np.linalg.norm(r_ij))
-    return (4 * np.pi * Y_bar_l_m(l, m, theta, phi) # be careful the order of theta and phi
+    theta, phi = cartesian_to_spherical(*r_ij, np.linalg.norm(r_ij))
+    return (4 * np.pi * Y_lm_real_scipy(l, m, theta, phi) # be careful the order of theta and phi
             * np.exp(-one_over_2_sigma_squared * np.sum(r_ij ** 2))
             * I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, DVR_BASIS_NUM))
 
 def P_bar_l_m(l, m, theta):
-    """
-        https://lab-cosmo.github.io/librascal/SOAP.html#spherical-harmonics
-
-        lpmv: Associated Legendre function of integer order and real degree.
-    """
-    return np.sqrt(float((2 * l + 1) * factorial(l - m) / (2 * np.pi) / factorial(l + m))) * lpmv(m, l, np.cos(theta))
-
-
+    m = abs(m)
+    norm = sqrt((2 * l + 1) / (4 * pi) * factorial(l - m) / factorial(l + m))
+    return norm * lpmv(m, l, np.cos(theta)) * (-1) ** m
 
 def Y_bar_l_m(l, m, theta, phi):
-    """
-    l: angular momentum quantum num, [0, n-1]
-    m: magnetic quantum num, [-l, l]
-    theta: polar angle, [0, pi]
-    phi: azimuthal angle, [0, 2pi]
-
-    Note that it lacks (-1)^m compared to the wiki definition: https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form
-    When times (-1)^m again, it is same as the implementation in tests.script.numerical_utils.Y_lm_real_scipy
-    """
-
-    """
-    https://lab-cosmo.github.io/librascal/SOAP.html#spherical-harmonics
-    """
     if m > 0:
-        return cos(m * phi) * P_bar_l_m(l, m, theta)
+        return SQRT_2 * P_bar_l_m(l, m, theta) * np.cos(m * phi)
     elif m < 0:
-        return sin(-m * phi) * P_bar_l_m(l, -m, theta)
+        return SQRT_2 * P_bar_l_m(l, -m, theta) * np.sin(-m * phi)
     else:
-        return SQRT_2 * P_bar_l_m(l, 0, theta)
-
-
-
-
-if __name__ == '__main__':
-    import numpy as np
-    from scipy.special import sph_harm, lpmv, factorial
-
-    SQRT_2 = 1.0 / np.sqrt(2)
-
-
-    def P_bar_l_m(l, m, theta):
-        return (-1) ** m * np.sqrt((2 * l + 1) * factorial(l - m) / (2 * np.pi) / factorial(l + m)) * lpmv(m, l, np.cos(
-            theta))
-
-
-    def Y_bar_l_m(l, m, theta, phi):
-        if m > 0:
-            return np.cos(m * phi) * P_bar_l_m(l, m, theta)
-        elif m < 0:
-            return np.sin(-m * phi) * P_bar_l_m(l, -m, theta)
-        else:
-            return SQRT_2 * P_bar_l_m(l, 0, theta)
-
-
-    def sph_harm_y(l, m, theta, phi):
-        return sph_harm(m, l, phi, theta)  # Note: scipy order (m, l, phi, theta)
-
-
-    def Y_lm_real_scipy(l, m, theta, phi):
-        if m == 0:
-            return sph_harm_y(l, 0, theta, phi).real
-        elif m > 0:
-            return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real
-        else:
-            return np.sqrt(2) * (-1) ** m * sph_harm_y(l, -m, theta, phi).imag
-
-
-    # Generate 100,000 random test values for theta in [0, pi] and phi in [0, 2pi]
-    np.random.seed(42)
-    theta_rand = np.random.uniform(0, np.pi, 100000)
-    phi_rand = np.random.uniform(0, 2 * np.pi, 100000)
-
-    # Test over a few (l, m) combinations
-    results = {}
-    for l, m in [(1, 0), (2, 1), (3, 2), (4, -1), (5, -3)]:
-        y1 = Y_bar_l_m(l, m, theta_rand, phi_rand)
-        y2 = Y_lm_real_scipy(l, m, theta_rand, phi_rand)
-        max_diff = np.max(np.abs(y1 - y2))
-        results[(l, m)] = max_diff
-
-    print(results)
+        return P_bar_l_m(l, 0, theta)

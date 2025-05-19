@@ -8,7 +8,7 @@ import scipy
 from sympy.functions.special.spherical_harmonics import Ynm, Ynm_c, Znm
 import sympy as sp
 from scipy.special import eval_legendre, roots_legendre, sph_harm_y
-
+from sympy.utilities.decorator import deprecated
 
 # local module
 import utils_ext
@@ -21,7 +21,9 @@ def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configratio
     x, y, z = config.LEBEDEV_POINTS * r  # scaled sample points
     values = f_cartesion(x, y, z) * real_spherical_harmonics(config.LEBEDEV_THETA, config.LEBEDEV_PHI)
     surface_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
-    result = dvr_basis_function(n, r, config.N_MAX)
+    # TODO here is not right
+    x_mapped = (r / 3) - 1  # inverse mapping
+    result = dvr_basis_function(n, x_mapped, config.N_MAX)
     return surface_integral * r ** 2 * result
 
 
@@ -33,9 +35,8 @@ def phi_n(n, x):
 
 # Construct DVR basis function ψ_j(x)
 def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
-    x_grid, w = roots_legendre(LEGENDRE_ORDER_NUM)
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
-    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(w[j])
+    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 
 def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config, n):
@@ -72,7 +73,7 @@ def compute_sph_coefficients(density_fun, config:Configration):
     coeffs = []
     for n in range(config.N_MAX):
         for l, m in l_m_pairs(config.L_MAX):
-                real_spherical_harmonics = Y_lm_real_scipy1(l, m)
+                real_spherical_harmonics = Y_lm_real_fun_scipy(l, m)
                 # real_spherical_harmonics = Y_lm_real_sympy(l, m)
 
                 # real_spherical_harmonics()
@@ -89,7 +90,7 @@ def plot_LCAO(coefficients, l_max, cutoff):
     for l in np.arange(0, l_max + 1):
         for m in np.arange(-l, l + 1):
             if abs(coefficients[i]) > 1e-10:
-                values += Y_lm_real_sympy(l, m)(theta, phi) * coefficients[i]
+                values += Y_lm_real_fun_sympy(l, m)(theta, phi) * coefficients[i]
             # plot_spherical_harmonics_for_scipy(l, m, coefficients[i])
             i += 1
 
@@ -172,7 +173,7 @@ def backwards_check(density_result, coefficients, theta, phi, l_max):
     i = 0
     for l in np.arange(0, l_max + 1, dtype=int):
         for m in np.arange(-l, l + 1, dtype=int):
-            result += Y_lm_real_sympy(l, m)(theta, phi) * coefficients[i]
+            result += Y_lm_real_fun_sympy(l, m)(theta, phi) * coefficients[i]
             i += 1
 
     result_ = np.allclose(density_result, result, rtol=1e-2, atol=1e-2)
@@ -181,10 +182,15 @@ def backwards_check(density_result, coefficients, theta, phi, l_max):
     diff_norm = np.linalg.norm(density_result - result)
     print(f"Norm of difference: {diff_norm}")
 
-
-def Y_lm_real_sympy(l, m):
+# @deprecated("The implementation of sympy.Znm is not same as wiki:https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form, please use scipy Y_lm instead")
+def Y_lm_real_fun_sympy(l, m):
     """
         build real spherical harmonics
+
+        Be careful: the implementation of Znm is not same as wiki:
+         https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
+         https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form
+
         Parameters:
         l (int): Degree of the spherical harmonic.
         m (int): Order of the spherical harmonic.
@@ -197,8 +203,10 @@ def Y_lm_real_sympy(l, m):
     return lambda theta, phi: f(theta, phi).real
     # return Y, theta_sym, phi_sym
 
-def Y_lm_real_scipy1(l, m):
+def Y_lm_real_fun_scipy(l, m):
     """
+    Same as wikipedia: https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form
+
     In SciPy sph_harm, the order is :
         m,
         l,
@@ -247,7 +255,7 @@ def Y_lm_real_scipy1(l, m):
         if m == 0:
             return sph_harm_y(l, 0, theta, phi).real
         elif m > 0:
-            return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real  # Even
+            return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real   # Even
         else:
             return np.sqrt(2) * np.power(-1., m) * np.imag(sph_harm_y(l, -m, theta, phi))  # Odd
     return fun
@@ -324,7 +332,7 @@ def plot_spherical_harmonics_for_sympy(l, m, CUT_OFF, num=100):
     # Grids of polar and azimuthal angles
     theta, phi = utils_ext.theta_phi_meshgrid(num)
 
-    Z_lm = Y_lm_real_sympy(l, m)
+    Z_lm = Y_lm_real_fun_sympy(l, m)
     values = Z_lm(theta, phi)
     if not isinstance(values, np.ndarray):
         print("values is NOT a NumPy array")
