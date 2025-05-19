@@ -21,8 +21,7 @@ def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configratio
     x, y, z = config.LEBEDEV_POINTS * r  # scaled sample points
     values = f_cartesion(x, y, z) * real_spherical_harmonics(config.LEBEDEV_THETA, config.LEBEDEV_PHI)
     surface_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
-    # TODO here is not right
-    x_mapped = (r / 3) - 1  # inverse mapping
+    x_mapped = (r / (config.CUT_OFF / 2)) - 1  # inverse mapping
     result = dvr_basis_function(n, x_mapped, config.N_MAX)
     return surface_integral * r ** 2 * result
 
