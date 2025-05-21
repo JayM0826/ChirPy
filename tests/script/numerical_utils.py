@@ -12,18 +12,18 @@ from sympy.utilities.decorator import deprecated
 
 # local module
 import utils_ext
-from tests.script.configuration import Configration
+from tests.script.configuration import Configuration
 from tests.script.utils_ext import l_m_pairs
 
 
-def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configration, n, r):
+def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configuration, n, r):
     # order can be dynamic based on r, because when r is small, no need to sample too many points
     x, y, z = config.LEBEDEV_POINTS * r  # scaled sample points
     values = f_cartesion(x, y, z) * real_spherical_harmonics(config.LEBEDEV_THETA, config.LEBEDEV_PHI)
-    surface_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
+    sphere_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
     x_mapped = (r / (config.CUT_OFF / 2)) - 1  # inverse mapping
     result = dvr_basis_function(n, x_mapped, config.N_MAX)
-    return surface_integral * r ** 2 * result
+    return sphere_integral * r ** 2 * result * config.CUT_OFF / 2
 
 
 # Orthonormal Legendre polynomial function on [-1, 1]
@@ -38,7 +38,7 @@ def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
     return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 
-def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config, n):
+def project_density_to_basis(density_fun, real_spherical_harmonics, config, n):
     """
     the basis must be orthogonal
     """
@@ -49,8 +49,7 @@ def project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, conf
 
 
 def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
-    relative_distances = atom_positions - atom_positions[
-        config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    relative_distances = atom_positions - atom_positions[config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
     # NB: r must be an array
     relative_xs = relative_distances[:, 0]
     relative_ys = relative_distances[:, 1]
@@ -68,7 +67,7 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
     return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
 
 
-def compute_sph_coefficients(density_fun, config:Configration):
+def compute_coefficients(density_fun, config:Configuration):
     coeffs = []
     for n in range(config.N_MAX):
         for l, m in l_m_pairs(config.L_MAX):
@@ -76,7 +75,7 @@ def compute_sph_coefficients(density_fun, config:Configration):
                 # real_spherical_harmonics = Y_lm_real_sympy(l, m)
 
                 # real_spherical_harmonics()
-                coeff = project_density_to_sph_harmonics(density_fun, real_spherical_harmonics, config, n)
+                coeff = project_density_to_basis(density_fun, real_spherical_harmonics, config, n)
                 coeffs.append(coeff)
     return np.asarray(coeffs)
 
@@ -86,10 +85,10 @@ def plot_LCAO(coefficients, l_max, cutoff):
     theta, phi = utils_ext.theta_phi_meshgrid()
 
     values = np.zeros(shape=theta.shape)
-    for l in np.arange(0, l_max + 1):
+    for l in np.arange(0, l_max):
         for m in np.arange(-l, l + 1):
             if abs(coefficients[i]) > 1e-10:
-                values += Y_lm_real_fun_sympy(l, m)(theta, phi) * coefficients[i]
+                values += Y_lm_real_fun_scipy(l, m)(theta, phi) * coefficients[i]
             # plot_spherical_harmonics_for_scipy(l, m, coefficients[i])
             i += 1
 
@@ -109,13 +108,13 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
     print(f"There will be {len(trajectory)} frames need to calculate...")
     # the grid shape should be the same for all the frames, otherwise we cannot add them up
     first_frame = trajectory[0][:, 0:3]
-    filtered_first_frame, _ = utils_ext.filter_atoms_within_cutoff(first_frame, config.ORIGIN_ATOM_INDEX,
+    first_frame_within_cutoff, _ = utils_ext.filter_atoms_within_cutoff(first_frame, config.ORIGIN_ATOM_INDEX,
                                                                    config.CUT_OFF)
-    xv, yv, zv, bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(filtered_first_frame, sigmas,
+    grid_xv, grid_yv, grid_zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(first_frame_within_cutoff, sigmas,
                                                                            config.NUMBER_PER_UNIT_DISTANCE,
                                                                            config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
-    print(f"grid detail:shape={xv.shape} bounds={bounds}")
-    total_density_result = np.zeros_like(xv)
+    print(f"grid detail:shape={grid_xv.shape} xyz_bounds={xyz_bounds}")
+    total_density_result = np.zeros_like(grid_xv)
     i = 0
     # here use the first frame of the trajectory
     for atom_positions in trajectory[:1, :, 0:3]:
@@ -125,14 +124,14 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # calculate the density of frame i
         # ****************************************************************
         print(f"Now start to calculate the density of frame {i}")
-        filtered_first_frame, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(atom_positions,
+        first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(atom_positions,
                                                                                          config.ORIGIN_ATOM_INDEX,
                                                                                          config.CUT_OFF)
-        density_fun = trans_invariant_density_fun(filtered_first_frame, config, smooth_coefficients)
-        new_density_result = density_fun(xv, yv, zv)
+        density_fun = trans_invariant_density_fun(first_frame_within_cutoff, config, smooth_coefficients)
+        new_density_result = density_fun(grid_xv, grid_yv, grid_zv)
         if not isinstance(new_density_result, np.ndarray):
             print("new_density_result is NOT a NumPy array")
-            new_density_result = np.full(xv.shape, new_density_result)
+            new_density_result = np.full(grid_xv.shape, new_density_result)
         print(
             f"Integration of density of frame {i} over all intervals is {scipy.integrate.simpson(scipy.integrate.simpson(scipy.integrate.simpson(new_density_result, R_z), R_y), R_x)}"
             f", it should be equal to the number of atoms:{len(atom_positions)}")
@@ -150,7 +149,7 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # ****************************************************************
         # plot the linear combination of real spherical harmonics function
         # ****************************************************************
-        coefficients = compute_sph_coefficients(density_fun, config)
+        coefficients = compute_coefficients(density_fun, config)
         # print(coefficients)
         utils_ext.print_format_nlm_coefficients(coefficients, config.N_MAX, config.L_MAX)
         # plot_LCAO(coefficients, config.L_MAX, config.CUT_OFF)
@@ -159,10 +158,10 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # ****************************************************************
 
         # TODO it later
-        # theta, phi = utils_ext.cartesian_to_spherical(xv, yv, zv)
+        # theta, phi = utils_ext.cartesian_to_spherical(grid_xv, grid_yv, grid_zv)
         # backwards_check(new_density_result, coefficients, theta, phi, config.L_MAX)
 
-    return total_density_result, R_x, R_y, R_z, coefficients
+    return total_density_result, R_x, R_y, R_z, coefficients, density_fun
 
 
 
@@ -172,7 +171,7 @@ def backwards_check(density_result, coefficients, theta, phi, l_max):
     i = 0
     for l in np.arange(0, l_max + 1, dtype=int):
         for m in np.arange(-l, l + 1, dtype=int):
-            result += Y_lm_real_fun_sympy(l, m)(theta, phi) * coefficients[i]
+            result += Y_lm_real_fun_scipy(l, m)(theta, phi) * coefficients[i]
             i += 1
 
     result_ = np.allclose(density_result, result, rtol=1e-2, atol=1e-2)
@@ -181,26 +180,7 @@ def backwards_check(density_result, coefficients, theta, phi, l_max):
     diff_norm = np.linalg.norm(density_result - result)
     print(f"Norm of difference: {diff_norm}")
 
-# @deprecated("The implementation of sympy.Znm is not same as wiki:https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form, please use scipy Y_lm instead")
-def Y_lm_real_fun_sympy(l, m):
-    """
-        build real spherical harmonics
 
-        Be careful: the implementation of Znm is not same as wiki:
-         https://en.wikipedia.org/wiki/Table_of_spherical_harmonics#Real_spherical_harmonics
-         https://en.wikipedia.org/wiki/Spherical_harmonics#Real%20form
-
-        Parameters:
-        l (int): Degree of the spherical harmonic.
-        m (int): Order of the spherical harmonic.
-        Returns:
-        function: Znm(theta[0,pi], phi[0,2pi])
-        """
-    theta_sym, phi_sym = sp.symbols('theta phi', real=True)
-    Y_lm = Znm(l, m, theta_sym, phi_sym).expand(func=True)
-    f = sp.lambdify((theta_sym, phi_sym), Y_lm, 'numpy')
-    return lambda theta, phi: f(theta, phi).real
-    # return Y, theta_sym, phi_sym
 
 def Y_lm_real_fun_scipy(l, m):
     """
@@ -322,40 +302,6 @@ def Y_lm_real_scipy(l, m, theta, phi):
     # return Y
 
 
-def plot_spherical_harmonics_for_sympy(l, m, CUT_OFF, num=100):
-    """
-    l : [0, +oo]
-    m : [-l, l]
-      function: Znm(theta[0,pi], phi[0,2pi])
-    """
-    # Grids of polar and azimuthal angles
-    theta, phi = utils_ext.theta_phi_meshgrid(num)
-
-    Z_lm = Y_lm_real_fun_sympy(l, m)
-    values = Z_lm(theta, phi)
-    if not isinstance(values, np.ndarray):
-        print("values is NOT a NumPy array")
-        values = np.full(theta.shape, values)
-    # https://en.wikipedia.org/wiki/File:Rotating_spherical_harmonics.gif
-    # x, y, z = utils_ext.spherical_to_cartesian(theta, phi, CUT_OFF)
-
-    x, y, z = utils_ext.unit_spherical_to_cartesian(theta, phi, values) * CUT_OFF
-
-    fig = go.Figure(data=[go.Surface(x=x, y=y, z=z, surfacecolor=values, colorscale='Viridis')])
-    fig.update_layout(
-        title=f"real spherical harmonics of sympy Y_{l}_{m}",
-        scene=dict(
-            xaxis_title='X',
-            yaxis_title='Y',
-            zaxis_title='Z',
-            xaxis=dict(range=[-CUT_OFF, CUT_OFF], autorange=False),
-            yaxis=dict(range=[-CUT_OFF, CUT_OFF], autorange=False),
-            zaxis=dict(range=[-CUT_OFF, CUT_OFF], autorange=False),
-            aspectratio=dict(x=1, y=1, z=1)
-        )
-    )
-    fig.show()
-
 
 def plot_LCAO_spherical_harmonics(values, xs, ys, zs, CUT_OFF):
     fig = go.Figure()
@@ -433,21 +379,3 @@ def plot_spherical_harmonics_for_scipy(l, m, coefficient, CUT_OFF, num=100):
     )
     fig.show()
 
-# for l in np.arange(0, 4):
-#     for m in np.arange(-l, l+1):
-#         plot_spherical_harmonics_for_sympy(l, m, 5)
-#         plot_spherical_harmonics_for_scipy(l, m,  1, 5)
-
-# x = 0.3466097
-# y = -0.1928484
-# z = 0.1096611
-# r = np.sqrt(x**2+y**2+z**2)
-#
-# theta, phi = cartesian_to_spherical(x, y, z, r)
-# Z_lm = Y_lm_real(1, 1)
-# values = Z_lm(theta, phi)
-# print(values)
-# print(real_sph_harm(1, 1, theta, phi))
-# def Y_0_0(a):
-#     return 5 # return a constant arbitrarily
-# print(Y_0_0(np.arange(0, 5))) # output: 5 not [5,5,5,5,5]

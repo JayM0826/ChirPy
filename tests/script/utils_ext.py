@@ -16,6 +16,7 @@ import warnings
 import functools
 
 
+
 def print_format_nlm_coefficients(coefficients, n_max,  l_max):
     for n in range(n_max):
         print(f"{100 * '*'}n={n}: COEFFICIENTS{140 * '*'}")
@@ -107,13 +108,14 @@ def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance, c
     """
        number_per_unit_distance: the grid number per unit distance
     """
-    bounds = coupute_XYZ_bounds(atom_positions, sigmas, cutoff, origin_index)
-    R_x = np.linspace(bounds[0], bounds[1], (bounds[1] - bounds[0]) * number_per_unit_distance)
-    R_y = np.linspace(bounds[2], bounds[3], (bounds[3] - bounds[2]) * number_per_unit_distance)
-    R_z = np.linspace(bounds[4], bounds[5], (bounds[5] - bounds[4]) * number_per_unit_distance)
+    # xyz_bounds = [x_lower, x_upper, y_lower, y_upper, z_lower, z_upper]
+    xyz_bounds = coupute_XYZ_bounds(atom_positions, sigmas, cutoff, origin_index)
+    R_x = np.linspace(xyz_bounds[0], xyz_bounds[1], (xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
+    R_y = np.linspace(xyz_bounds[2], xyz_bounds[3], (xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
+    R_z = np.linspace(xyz_bounds[4], xyz_bounds[5], (xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
 
     xv, yv, zv = np.meshgrid(R_x, R_y, R_z, indexing='ij')
-    return xv, yv, zv, bounds, R_x, R_y, R_z
+    return xv, yv, zv, xyz_bounds, R_x, R_y, R_z
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
@@ -155,7 +157,7 @@ def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
     - cutoff: Cutoff radius (e.g., in Å).
 
     Returns:
-    - Filtered array of qualifying atoms (excluding center if desired).
+    - return a fully new filtered array of qualified atoms (including origin atom).
     """
     origin_pos = positions[origin_atom_index]
     relative_distance = np.sqrt(np.sum((positions - origin_pos) ** 2, axis=1))

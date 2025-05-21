@@ -1,9 +1,18 @@
-import numpy as np
-from scipy.special import sph_harm, lpmv, factorial
+import random
 
-from tests.script.analytical_utils import Y_bar_l_m, dvr_basis_function
-from tests.script.numerical_utils import Y_lm_real_scipy, Y_lm_real_fun_sympy
+import chirpy as cp
+import numpy as np
+
+import numerical_utils as num_utils
+from tests.script import utils_ext
+from tests.script.analytical_utils import Y_bar_l_m
+from tests.script.configuration import Configuration
+from tests.script.numerical_utils import Y_lm_real_scipy
 from tests.script.utils_ext import l_m_pairs
+from pathlib import Path
+
+from scipy.spatial.transform import Rotation as R
+
 
 def test_spherical_integral():
     import sympy as sp
@@ -39,8 +48,8 @@ def testYlm():
         print(l, m)
         y1 = Y_bar_l_m(l, m, theta_rand, phi_rand)
         y2 = Y_lm_real_scipy(l, m, theta_rand, phi_rand)
-        y3_fun = Y_lm_real_fun_sympy(l, m)
-        y3 = y3_fun(theta_rand, phi_rand)
+        # y3_fun = Y_lm_real_fun_sympy(l, m)
+        # y3 = y3_fun(theta_rand, phi_rand)
         assert np.allclose(y2, y1, rtol=0.000001, atol=0.00001), 'Backward check failed'
 
 
@@ -74,4 +83,131 @@ def test_dvr_orthogonal_normality(fun):
             integrand = fun(n1, x_plot, LEGENDRE_ORDER_NUM) * fun(n2, x_plot, LEGENDRE_ORDER_NUM) * delta_x
             result = np.sum(integrand)
             print(f"⟨dvr_basis_function_{n1}, dvr_basis_function_{n2}⟩ = {result:.15f}")
-test_dvr_orthogonal_normality(dvr_basis_function)
+# test_dvr_orthogonal_normality(dvr_basis_function)
+
+
+
+
+
+def compare_arrays(name, arr1, arr2):
+    if np.allclose(arr1, arr2):
+        print(f"{name}: ✅ Equal")
+    else:
+        print(f"{name}: ❌ Not Equal")
+
+
+def test_translational_invariant_for_generate_grid_and_bounds():
+    BASE_PATH = Path(__file__).parent
+    filepath = utils_ext.get_relative_path(BASE_PATH, "tartrate.xyz").as_posix()
+    system = cp.trajectory.XYZ(filepath).expand()
+    frame_1 = system.data[0][:, 0:3]
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    frame_trans = frame_1 + np.random.randint(1, 100 + 1)
+    first_frame_within_cutoff_trans, smooth_coefficients_trans = utils_ext.filter_atoms_within_cutoff(frame_trans,
+                                                                                                      config.ORIGIN_ATOM_INDEX,
+                                                                                                      config.CUT_OFF)
+
+    grid_xv_trans, grid_yv_trans, grid_zv_trans, xyz_bounds_trans, R_x_trans, R_y_trans, R_z_trans = utils_ext.generate_grid_and_bounds(
+        first_frame_within_cutoff_trans, sigmas,
+        config.NUMBER_PER_UNIT_DISTANCE,
+        config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
+
+    grid_xv, grid_yv, grid_zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(
+        first_frame_within_cutoff, sigmas,
+        config.NUMBER_PER_UNIT_DISTANCE,
+        config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
+
+    compare_arrays("grid_xv", grid_xv_trans, grid_xv)
+    compare_arrays("grid_yv", grid_yv_trans, grid_yv)
+    compare_arrays("grid_zv", grid_zv_trans, grid_zv)
+    compare_arrays("xyz_bounds", xyz_bounds_trans, xyz_bounds)
+    compare_arrays("R_x", R_x_trans, R_x)
+    compare_arrays("R_y", R_y_trans, R_y)
+    compare_arrays("R_z", R_z_trans, R_z)
+
+# test_translational_invariant_for_generate_grid_and_bounds()
+
+
+def test_translational_invariant_density_fun():
+    # === Create example 3D coordinates ===
+    np.random.seed(42)
+    frame_1 = np.random.rand(5, 3)  # 5 random 3D points
+
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config, smooth_coefficients)
+    frame_trans = frame_1 + np.random.randint(1, 100 + 1)
+    first_frame_within_cutoff_trans, smooth_coefficients_trans = utils_ext.filter_atoms_within_cutoff(frame_trans,
+                                                                                                      config.ORIGIN_ATOM_INDEX,
+                                                                                                      config.CUT_OFF)
+    density_fun_trans = num_utils.trans_invariant_density_fun(first_frame_within_cutoff_trans, config, smooth_coefficients_trans)
+
+    grid_xv, grid_yv, grid_zv, *_ = utils_ext.generate_grid_and_bounds(
+        first_frame_within_cutoff, sigmas,
+        config.NUMBER_PER_UNIT_DISTANCE,
+        config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
+
+    compare_arrays("density_function_invariant", density_fun_trans(grid_xv, grid_yv, grid_zv), density_fun(grid_xv, grid_yv, grid_zv))
+    return density_fun
+
+# test_translational_invariant_density_fun()
+
+def generate_random_rotation_matrix():
+    # Generate random Euler angles in degrees
+    angles = np.random.uniform(low=-180.0, high=180.0, size=3)
+    # R.from_euler('xyz', [α, β, γ], degrees=True)
+    rot = R.from_euler('xyz', angles, degrees=True)
+    return rot.as_matrix(), angles
+
+
+def test_rotational_invariant_density_fun():
+    # === Create example 3D coordinates ===
+    np.random.seed(42)
+    frame_1 = np.random.rand(5, 3)  # 5 random 3D points
+    R_mat, angles = generate_random_rotation_matrix()
+    xyz_rot = frame_1 @ R_mat.T
+
+
+
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config, smooth_coefficients)
+
+    first_frame_within_cutoff_rot, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(xyz_rot,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    density_fun_rot = num_utils.trans_invariant_density_fun(first_frame_within_cutoff_rot, config, smooth_coefficients)
+
+    grid_xv, grid_yv, grid_zv, *_ = utils_ext.generate_grid_and_bounds(
+        first_frame_within_cutoff, sigmas,
+        config.NUMBER_PER_UNIT_DISTANCE,
+        config.CUT_OFF, config.ORIGIN_ATOM_INDEX)
+
+    compare_arrays("test_rotational_invariant_density_fun", density_fun(grid_xv, grid_yv, grid_zv), density_fun_rot(grid_xv, grid_yv, grid_zv),)
+
+
+test_rotational_invariant_density_fun()
+
+
+def test_density_fun():
+
+    pass
+
+
+

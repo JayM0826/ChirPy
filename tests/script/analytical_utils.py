@@ -9,7 +9,7 @@ from scipy.integrate import quad
 from math import sqrt
 
 
-from tests.script.configuration import Configration
+from tests.script.configuration import Configuration
 from tests.script.numerical_utils import Y_lm_real_scipy
 from tests.script.utils_ext import cartesian_to_spherical, l_m_pairs
 
@@ -51,7 +51,7 @@ def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_N
     return I_nl_ij
 
 
-def compute_coefficients(atom_positions, sigmas, config:Configration):
+def compute_coefficients(atom_positions, sigmas, config:Configuration):
     """
     compute the coefficients in sequence one by one
     """

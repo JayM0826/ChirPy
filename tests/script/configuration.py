@@ -9,14 +9,14 @@ from pathlib import Path
 
 
 @dataclass
-class Configration:
+class Configuration:
 
     """
-    cfg = Configration()
+    cfg = Configuration()
     print(cfg.ORIGIN_ATOM_INDEX)
 
     if you want to override the default values, it is fine:
-    cfg = Config(NUMBER_PER_UNIT_DISTANCE=64, SIGMA=1.)
+    cfg = Configuration(NUMBER_PER_UNIT_DISTANCE=64, SIGMA=1.)
     """
 
     # **********************CONSTANT**************************************
