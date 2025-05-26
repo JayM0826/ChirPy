@@ -110,12 +110,12 @@ def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance, c
     """
     # xyz_bounds = [x_lower, x_upper, y_lower, y_upper, z_lower, z_upper]
     xyz_bounds = coupute_XYZ_bounds(atom_positions, sigmas, cutoff, origin_index)
-    R_x = np.linspace(xyz_bounds[0], xyz_bounds[1], (xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
-    R_y = np.linspace(xyz_bounds[2], xyz_bounds[3], (xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
-    R_z = np.linspace(xyz_bounds[4], xyz_bounds[5], (xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
+    x_linspace = np.linspace(xyz_bounds[0], xyz_bounds[1], (xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
+    y_linspace = np.linspace(xyz_bounds[2], xyz_bounds[3], (xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
+    z_linspace = np.linspace(xyz_bounds[4], xyz_bounds[5], (xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
 
-    xv, yv, zv = np.meshgrid(R_x, R_y, R_z, indexing='ij')
-    return xv, yv, zv, xyz_bounds, R_x, R_y, R_z
+    x_meshgrid, y_meshgrid, z_meshgrid = np.meshgrid(x_linspace, y_linspace, z_linspace, indexing='ij')
+    return x_meshgrid, y_meshgrid, z_meshgrid, xyz_bounds, x_linspace, y_linspace, z_linspace
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):

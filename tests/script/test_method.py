@@ -12,6 +12,7 @@ from tests.script.utils_ext import l_m_pairs
 from pathlib import Path
 
 from scipy.spatial.transform import Rotation as R
+import analytical_utils as ana_utils
 
 
 def test_spherical_integral():
@@ -202,12 +203,160 @@ def test_rotational_invariant_density_fun():
     compare_arrays("test_rotational_invariant_density_fun", density_fun(grid_xv, grid_yv, grid_zv), density_fun_rot(grid_xv, grid_yv, grid_zv),)
 
 
-test_rotational_invariant_density_fun()
+# test_rotational_invariant_density_fun() , this is wrong
+
+def test_if_analytical_coefficients_are_equal():
+    # === Create example 3D coordinates ===
+    np.random.seed(42)
+    frame_1 = np.random.rand(5, 3)  # 5 random 3D points
+
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+    coefficients_in_dict = ana_utils.compute_coefficients_in_dict([first_frame_within_cutoff], sigmas, config)
+    coefficients_in_sequence = ana_utils.compute_coefficients_in_sequence([first_frame_within_cutoff], sigmas, config)
+    # Sort coefficients by (n, l, m) and convert to array
+    sorted_keys = sorted(coefficients_in_dict.keys(), key=lambda x: (x[0], x[1], x[2]))
+    sorted_coefficients = np.array([coefficients_in_dict[key] for key in sorted_keys], dtype=np.float64)
+
+    assert np.allclose(sorted_coefficients, coefficients_in_sequence, 1e-5, 1e-5), "coefficients not equal"
+
+# test_if_coefficients_are_equal()
+
+def test_if_numerical_coefficients_are_equal():
+    # === Create example 3D coordinates ===
+    np.random.seed(42)
+    frame_1 = np.random.rand(5, 3)  # 5 random 3D points
+
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    analytical_density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config,
+                                                                   smooth_coefficients)
+    coefficients_in_dict = num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
+    coefficients_in_sequence = num_utils.compute_coefficients_in_sequence(analytical_density_fun, config)
+    # Sort coefficients by (n, l, m) and convert to array
+    sorted_keys = sorted(coefficients_in_dict.keys(), key=lambda x: (x[0], x[1], x[2]))
+    sorted_coefficients = np.array([coefficients_in_dict[key] for key in sorted_keys], dtype=np.float64)
+
+    assert np.allclose(sorted_coefficients, coefficients_in_sequence, 1e-5, 1e-5), "coefficients not equal"
+
+# test_if_numerical_coefficients_are_equal()
+#
+def test_density_fun_with_numerical_coefficients():
+
+    coordinates = [
+        [0.0, 0.0, 0.0],
+        [0.804, -0.310, 0.107],
+        [0.085, 0.804, 0.607],
+        [0.889, 0.494, 0.714]
+    ]
+
+    frame_1 = np.array(coordinates, dtype=np.float64)
 
 
-def test_density_fun():
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
 
-    pass
+    analytical_density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config, smooth_coefficients)
+
+    # coefficients = ana_utils.compute_coefficients_in_dict([frame_1], sigmas, config)
+
+
+    coefficients = num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
 
 
 
+    xv, yv, zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(frame_1, sigmas, 20, 3, 0)
+
+    analytical_function_values = analytical_density_fun(xv,yv, zv)
+
+    numerical_density_fun = 1
+    r = np.sqrt(xv ** 2 + yv ** 2 + zv ** 2)
+    thetas, phis = utils_ext.cartesian_to_spherical(xv, yv, zv, r)
+
+    psi = np.zeros_like(xv, dtype=np.float64)
+    for n in range(config.N_MAX):
+        for l, m in l_m_pairs(config.L_MAX):
+            # Get coefficient for (n, l, m)
+            c_nlm = coefficients.get((n, l, m), 0.0)
+            # Compute radial and angular parts
+
+            R_n = ana_utils.dvr_basis_function(n, r, config.N_MAX)
+            Y_lm = num_utils.Y_lm_real_scipy(l, m, thetas, phis)
+            # Add contribution to total function
+            psi += c_nlm * R_n * Y_lm
+
+
+
+    diff = analytical_function_values - psi
+    count = np.sum(abs(diff) > 0.1)
+    print(f"Number of elements in diff > 0.1: {count}")
+    # print(diff[diff>0.1])
+    assert np.allclose(analytical_function_values, psi, 1e-2, 1e-2), "coefficients not equal"
+
+# test_density_fun_with_numerical_coefficients()
+
+def test_density_fun_with_analytical_coefficients():
+    coordinates = [
+        [0.0, 0.0, 0.0],
+        [0.804, -0.310, 0.107],
+        [0.085, 0.804, 0.607],
+        [0.889, 0.494, 0.714]
+    ]
+
+    frame_1 = np.array(coordinates, dtype=np.float64)
+
+    sigmas = utils_ext.get_sigmas(frame_1)
+    config = Configuration()
+    config.SIGMAS = sigmas
+    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+                                                                                          config.ORIGIN_ATOM_INDEX,
+                                                                                          config.CUT_OFF)
+
+    analytical_density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config,
+                                                                   smooth_coefficients)
+
+    coefficients = ana_utils.compute_coefficients_in_dict([frame_1], sigmas, config)
+
+    # coefficients = num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
+
+    xv, yv, zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(frame_1, sigmas, 20, 3, 0)
+
+    analytical_function_values = analytical_density_fun(xv, yv, zv)
+
+    numerical_density_fun = 1
+    r = np.sqrt(xv ** 2 + yv ** 2 + zv ** 2)
+    thetas, phis = utils_ext.cartesian_to_spherical(xv, yv, zv, r)
+
+    psi = np.zeros_like(xv, dtype=np.float64)
+    for n in range(config.N_MAX):
+        for l, m in l_m_pairs(config.L_MAX):
+            # Get coefficient for (n, l, m)
+            c_nlm = coefficients.get((n, l, m), 0.0)
+            # Compute radial and angular parts
+
+            R_n = ana_utils.dvr_basis_function(n, r, config.N_MAX)
+            Y_lm = num_utils.Y_lm_real_scipy(l, m, thetas, phis)
+            # Add contribution to total function
+            psi += c_nlm * R_n * Y_lm
+
+    diff = analytical_function_values - psi
+    count = np.sum(abs(diff) > 0.1)
+    print(f"Number of elements in diff > 0.1: {count}")
+    # print(diff[diff>0.1])
+    assert np.allclose(analytical_function_values, psi, 1e-2, 1e-2), "coefficients not equal"
+
+
+test_density_fun_with_analytical_coefficients()

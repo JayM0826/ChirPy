@@ -80,7 +80,7 @@ class Application:
         frame_1 = system.data[0][:, 0:3]
         sigmas = utils_ext.get_sigmas(frame_1)
         self.config.SIGMAS = sigmas
-        coefficients = ana_utils.compute_coefficients(system.data, sigmas, self.config)
+        coefficients = ana_utils.compute_coefficients_in_dict(system.data, sigmas, self.config)
         utils_ext.print_format_nlm_coefficients(coefficients, self.config.N_MAX, self.config.L_MAX)
         return coefficients
 
@@ -88,7 +88,7 @@ if __name__ == '__main__':
     utils_ext.print_Gauss()
     utils_ext.print_banner("Gauß  START")
     app = Application("tartrate.xyz")
-    coeff_numerical = app.run_numerically()
+    # coeff_numerical = app.run_numerically()
 
 
 

@@ -33,7 +33,6 @@ def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
     return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
-
 def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_NUM):
     # Gauss-Legendre quadrature points and weights
     x, w = roots_legendre(LEGENDRE_ORDER_NUM)
@@ -51,7 +50,7 @@ def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_N
     return I_nl_ij
 
 
-def compute_coefficients(atom_positions, sigmas, config:Configuration):
+def compute_coefficients_in_sequence(atom_positions, sigmas, config:Configuration):
     """
     compute the coefficients in sequence one by one
     """
@@ -79,6 +78,42 @@ def compute_coefficients(atom_positions, sigmas, config:Configuration):
         full_coeff.extend(coeff_n_lm.tolist())
 
     return np.array(full_coeff, dtype=np.float64)
+
+
+def compute_coefficients_in_dict(atom_positions, sigmas, config: Configuration):
+    """
+    Compute the coefficients indexed by (n, l, m) quantum numbers.
+    """
+    first_frame = atom_positions[0][:, 0:3]
+    origin_atom_position = first_frame[config.ORIGIN_ATOM_INDEX]
+
+    # Dictionary to store coefficients with (n, l, m) keys
+    coefficients = {}
+
+    l_m_list = list(l_m_pairs(config.L_MAX))
+
+    for n in range(config.N_MAX):
+        for l, m in l_m_list:
+            coefficients[(n, l, m)] = 0.0
+
+        for idx, atom_position in enumerate(first_frame):
+            if idx == config.ORIGIN_ATOM_INDEX:
+                continue
+
+            for l, m in l_m_list:
+                coeff_n_lm_i = coefficient(
+                    origin_atom_position,
+                    atom_position - origin_atom_position,
+                    0.5 * (sigmas[idx] ** -2),
+                    n, l, m,
+                    config.L_MAX,
+                    config.DVR_BASIS_NUM
+                )
+                coefficients[(n, l, m)] += coeff_n_lm_i
+
+    return coefficients
+
+
 
 if __name__ == '__main__1':
 

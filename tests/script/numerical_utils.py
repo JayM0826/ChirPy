@@ -67,7 +67,7 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
     return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
 
 
-def compute_coefficients(density_fun, config:Configuration):
+def compute_coefficients_in_sequence(density_fun, config:Configuration):
     coeffs = []
     for n in range(config.N_MAX):
         for l, m in l_m_pairs(config.L_MAX):
@@ -78,6 +78,15 @@ def compute_coefficients(density_fun, config:Configuration):
                 coeff = project_density_to_basis(density_fun, real_spherical_harmonics, config, n)
                 coeffs.append(coeff)
     return np.asarray(coeffs)
+
+def compute_coefficients_in_dict(density_fun, config: Configuration):
+    coeffs = {}  # Use a dictionary with keys (n, l, m)
+    for n in range(config.N_MAX):
+        for l, m in l_m_pairs(config.L_MAX):
+            real_spherical_harmonics = Y_lm_real_fun_scipy(l, m)
+            coeff = project_density_to_basis(density_fun, real_spherical_harmonics, config, n)
+            coeffs[(n, l, m)] = coeff  # Store with tuple key
+    return coeffs
 
 
 def plot_LCAO(coefficients, l_max, cutoff):
@@ -149,7 +158,7 @@ def compute_whole_grid_distribution(trajectory, sigmas, config):
         # ****************************************************************
         # plot the linear combination of real spherical harmonics function
         # ****************************************************************
-        coefficients = compute_coefficients(density_fun, config)
+        coefficients = compute_coefficients_in_sequence(density_fun, config)
         # print(coefficients)
         utils_ext.print_format_nlm_coefficients(coefficients, config.N_MAX, config.L_MAX)
         # plot_LCAO(coefficients, config.L_MAX, config.CUT_OFF)
