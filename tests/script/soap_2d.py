@@ -30,7 +30,7 @@ def trans_invariant_density_alt_2D(atom_positions, sigma_2D, r_cutoff=np.inf, or
     return lambda x, y: np.sum(density(x, y), axis=0)
 
 
-def plotContour(xyz_data_2D, title, color_label, image_size_inches=(6.4, 4.8), save_fig=False, fig_name="2D_contour"):
+def plotContour(xyz_data_2D, title, color_label, image_size_inches=(12, 9), save_fig=False, fig_name="2D_contour"):
     X, Y, Z = xyz_data_2D
     plt.figure(figsize=image_size_inches)
     contour = plt.contour(X, Y, Z, levels=20, cmap="coolwarm")
@@ -96,17 +96,20 @@ if __name__ == "__main__":
 
     # Create 3D plot
     fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+
     ax.plot_surface(xv, yv, result, cmap='viridis', edgecolor='none')
 
     # Labels
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Density')
-    ax.set_title('2D Gaussian Density Plot')
-    plt.savefig("2D_denstity")
+    ax.set_title('2D smearing density function')
+
+    plt.savefig("2D_smearing_density_function")
+
     plt.show()
     plotContour(xyz_data_2D=(xv, yv, result), title="2D invariant gaussian functions density", color_label="2D Density",
-                save_fig=True, fig_name="2D_contour_2")
+                save_fig=True, fig_name="2D_smearing_density_function_contour")
 
 # relative_distances_2D  = atom_2D_position - atom_2D_position[0]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
 # relative_xs = relative_distances_2D[:, 0:1]

@@ -56,7 +56,7 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
     relative_zs = relative_distances[:, 2]
     total_result = [
         lambda x, y, z, rx=rx, ry=ry, rz=rz, sigma=sigma, pf=1 / (-2 * sigma ** 2), smooth_coefficient=smooth_coeff: (
-                smooth_coefficient * (config.ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
+                smooth_coefficient # * (config.ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
                 * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 + (z - rz) ** 2))
         )
         for rx, ry, rz, sigma, smooth_coeff
@@ -65,6 +65,17 @@ def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
     ]
 
     return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
+
+
+# Original density function (sum of Gaussians centered at atoms)
+# In theory, they are same.
+# def rho_original(r, atom_positions, sigma):
+#     """Compute original density at position r."""
+#     density = 0.0
+#     for r_j in atom_positions:
+#         rij = np.linalg.norm(r - r_j)
+#         density += np.exp(-rij**2 / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))**3
+#     return density
 
 
 def compute_coefficients_in_sequence(density_fun, config:Configuration):

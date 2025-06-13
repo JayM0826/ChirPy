@@ -1,18 +1,19 @@
-import random
+from pathlib import Path
 
 import chirpy as cp
 import numpy as np
+from numpy.polynomial.legendre import leggauss
+from scipy.integrate import simpson as simps
+from scipy.spatial.transform import Rotation as R
+from scipy.special import legendre
 
+import analytical_utils as ana_utils
 import numerical_utils as num_utils
 from tests.script import utils_ext
 from tests.script.analytical_utils import Y_bar_l_m
 from tests.script.configuration import Configuration
 from tests.script.numerical_utils import Y_lm_real_scipy
 from tests.script.utils_ext import l_m_pairs
-from pathlib import Path
-
-from scipy.spatial.transform import Rotation as R
-import analytical_utils as ana_utils
 
 
 def test_spherical_integral():
@@ -36,7 +37,7 @@ def test_spherical_integral():
 
     # Print result
     sp.pprint(total_integral, use_unicode=True)
-
+test_spherical_integral()
 
 def testYlm():
     SQRT_2 = 1.0 / np.sqrt(2)
@@ -224,7 +225,7 @@ def test_if_analytical_coefficients_are_equal():
 
     assert np.allclose(sorted_coefficients, coefficients_in_sequence, 1e-5, 1e-5), "coefficients not equal"
 
-# test_if_coefficients_are_equal()
+# test_if_analytical_coefficients_are_equal()
 
 def test_if_numerical_coefficients_are_equal():
     # === Create example 3D coordinates ===
@@ -346,8 +347,8 @@ def test_density_fun_with_analytical_coefficients():
             # Get coefficient for (n, l, m)
             c_nlm = coefficients.get((n, l, m), 0.0)
             # Compute radial and angular parts
-
-            R_n = ana_utils.dvr_basis_function(n, r, config.N_MAX)
+            x = 2 * r / config.CUT_OFF - 1  # map r in [0, rc] to x in [-1, 1]
+            R_n = ana_utils.dvr_basis_function(n, x, config.N_MAX)
             Y_lm = num_utils.Y_lm_real_scipy(l, m, thetas, phis)
             # Add contribution to total function
             psi += c_nlm * R_n * Y_lm
@@ -359,4 +360,61 @@ def test_density_fun_with_analytical_coefficients():
     assert np.allclose(analytical_function_values, psi, 1e-2, 1e-2), "coefficients not equal"
 
 
-test_density_fun_with_analytical_coefficients()
+# test_density_fun_with_analytical_coefficients()
+
+
+def test_scaled_DVR_orthogonality():
+
+
+    # Parameters
+    N = 10  # number of DVR basis functions
+    a, b = 0.0, 5.0  # new interval
+
+    # 1. Get Gauss-Legendre nodes and weights on [-1, 1]
+    x_nodes, w_weights = leggauss(N)
+
+    # 2. Define orthonormalized Legendre polynomial basis on [-1, 1]
+    def phi_j_standard(j, x):
+        Pj = legendre(j)
+        return np.sqrt((2 * j + 1) / 2) * Pj(x)
+
+    # 3. Construct DVR basis on [-1, 1]
+    x_dense = np.linspace(-1, 1, 1000)
+    chi_std = np.zeros((N, len(x_dense)))
+
+    for alpha in range(N):
+        for j in range(N):
+            phi_j_x = phi_j_standard(j, x_dense)
+            phi_j_node = phi_j_standard(j, x_nodes[alpha])
+            chi_std[alpha] += phi_j_x * phi_j_node
+        chi_std[alpha] *= np.sqrt(w_weights[alpha])
+
+    # 4. Check orthonormality on [-1, 1]
+    overlap_std = np.zeros((N, N))
+    for m in range(N):
+        for n in range(N):
+            overlap_std[m, n] = simps(chi_std[m] * chi_std[n], x_dense)
+
+    # 5. Map nodes and weights to [a, b]
+    x_mapped = 0.5 * (b - a) * x_nodes + 0.5 * (b + a)
+    w_mapped = 0.5 * (b - a) * w_weights
+
+    # 6. Construct mapped DVR basis on [a, b]
+    x_dense_mapped = 0.5 * (b - a) * x_dense + 0.5 * (b + a)
+    chi_mapped = np.zeros((N, len(x_dense_mapped)))
+
+    for alpha in range(N):
+        for j in range(N):
+            # return to 1???
+            phi_j_x = phi_j_standard(j, (2 * x_dense_mapped - (b + a)) / (b - a))
+            phi_j_node = phi_j_standard(j, x_nodes[alpha])
+            chi_mapped[alpha] += phi_j_x * phi_j_node
+        chi_mapped[alpha] *= np.sqrt(w_mapped[alpha])
+
+    # 7. Check overlap on [a, b]
+    overlap_mapped = np.zeros((N, N))
+    for m in range(N):
+        for n in range(N):
+            overlap_mapped[m, n] = simps(chi_mapped[m] * chi_mapped[n], x_dense_mapped)
+
+    print(overlap_std, overlap_mapped)

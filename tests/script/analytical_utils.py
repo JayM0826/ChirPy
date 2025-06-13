@@ -22,16 +22,26 @@ PI_POW_3_DIV_2 = np.pi ** (1.5)
 def phi_n(n, x):
     """
     Orthonormal Legendre polynomial function on [-1, 1]
+    from numpy.polynomial.legendre import leggauss, Legendre
+    It equals Legendre.basis(n)(x) / norm below, because Legendre.basis(n)(x) is not normalized
+    namely eval_legendre(n, x) = Legendre.basis(n)(x)
     n:base 0
+
     """
+    # common weight function: https://www.pci.uni-heidelberg.de/tc/usr/mctdh/lit/NumericalMethods.pdf page 17 Eq. 2.50 and 2.55, This weight is used for integration rather than sum
     weight_func = 1 # Polynomial dependent, for definition, see Eq. 2.1. in Light, J. C., & Carrington, T. (2007). Discrete-Variable Representations and their Utilization (pp. 263–310). John Wiley & Sons, Ltd. https://doi.org/10.1002/9780470141731.ch4
-    norm = np.sqrt((2 * n + 1) / 2)
+    norm = np.sqrt((2 * n + 1) / 2) # for normalization
     return norm * eval_legendre(n, x) * np.sqrt(weight_func)
 
+
+
 # Construct DVR basis function ψ_j(x)
-def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
+def dvr_basis_function(j, sample_points_plot, LEGENDRE_ORDER_NUM):
+    """
+    here sample_points_plot must be in [-1, 1]
+    """
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
-    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
+    return sum(phi_n(n, sample_points_plot) * phi_n(n, root_x[j]) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_NUM):
     # Gauss-Legendre quadrature points and weights
@@ -39,12 +49,12 @@ def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_N
 
     # Scale quadrature points and weights
     x_n = (r_cutoff / 2.) * (x[n] + 1)
-    w_n = w[n]
+    w_n = w[n] * r_cutoff / 2.
 
     # Compute the radial integral, spherical_in: modified spherical Bessel function of the first kind
-    I_nl_ij = (r_cutoff / 2.
-               * np.sqrt(w_n)
-               * x_n ** 2
+    I_nl_ij = (
+                np.sqrt(w_n)
+               * x_n # TODO please check here: x_n ** 2 or x_n?
                * np.exp(-one_over_2_sigma_squared * x_n ** 2)
                * spherical_in(l, 2 * one_over_2_sigma_squared * x_n * np.linalg.norm(r_ij)))
     return I_nl_ij
@@ -53,6 +63,8 @@ def I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, LEGENDRE_ORDER_N
 def compute_coefficients_in_sequence(atom_positions, sigmas, config:Configuration):
     """
     compute the coefficients in sequence one by one
+    Due to the length of all ls belonging to different ns  is same,
+    here we store the coefficients as shape=(n, (l+1)^2)
     """
     first_frame = atom_positions[0][:, 0:3]
     origin_atom_position = first_frame[config.ORIGIN_ATOM_INDEX]
@@ -115,49 +127,49 @@ def compute_coefficients_in_dict(atom_positions, sigmas, config: Configuration):
 
 
 
-if __name__ == '__main__1':
+if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
     # Number of DVR points / polynomial order
-    N = 100
+    N = 120
 
     # Get Gauss-Legendre quadrature points (nodes) and weights
-    x_grid, w = roots_legendre(N)
+    zero_point_grid, w = roots_legendre(N)
 
     # Grid for plotting
-    x_plot = np.linspace(-1, 1, 1000)
+    sample_points_plot = np.linspace(-1, 1, 1000)
 
     # transform to R
     r_c = 15
-    r_plot = x_plot * r_c/2 + r_c/2
-    r_grid = x_grid * r_c/2 + r_c/2
+    scaled_sample_points_plot = sample_points_plot * r_c / 2 + r_c / 2
+    scaled_zero_point_grid = zero_point_grid * r_c / 2 + r_c / 2
 
     # -- test settings
     a = 4
     r_neighbours = [2., 4. , 3, 1]
 
     # --- summed density
-    rho_tilde = np.zeros_like(r_plot)
+    rho_tilde = np.zeros_like(scaled_sample_points_plot)
     # Plot DVR basis functions
     plt.figure(figsize=(10, 6))
 
     # here a, namely sigma,  controls the connection between the below density function and the superposition of the dvr radial basis
     for r_ij in r_neighbours:
         for j in range(N):
-            cj =  np.exp(-a*r_ij**2) * r_c/2  * np.sqrt(w[j]) * np.exp(-a*r_grid[j]**2) * spherical_in(0, 2*a*r_grid[j]*r_ij)
+            cj = np.exp(-a*r_ij**2) * r_c / 2 * np.sqrt(w[j]) * np.exp(-a * scaled_zero_point_grid[j] ** 2) * spherical_in(0, 2 * a * scaled_zero_point_grid[j] * r_ij)
             # plt.plot(r_plot, dvr_function(j, x_plot)*np.sqrt(w[j]), color='k', alpha=(1.2-j/N)/1.2*0.2, lw=1, ls=':', zorder=-1000)
-            plt.plot(r_plot, cj * dvr_basis_function(j, x_plot, N) * r_plot**2, '--') # r_plot**2 jacobian
-            rho_tilde += cj * dvr_basis_function(j, x_plot, N) * r_plot**2
+            plt.plot(scaled_sample_points_plot, cj * dvr_basis_function(j, sample_points_plot, N) * scaled_sample_points_plot ** 2, '--') # r_plot**2 jacobian
+            rho_tilde += cj * dvr_basis_function(j, sample_points_plot, N) * scaled_sample_points_plot ** 2
 
 
     # --- compare with radial part of Gaussian function * R**2
     # this is the radial density function, not radial basis
     rho = np.zeros_like(rho_tilde)
     for r_ij in r_neighbours:
-        rho += r_c/2. * np.exp(-a*(r_plot**2+r_ij**2))* np.sinh(2*a*r_plot*r_ij) / (2*a*r_ij) * r_plot
+        rho += r_c / 2. * np.exp(-a * (scaled_sample_points_plot ** 2 + r_ij ** 2)) * np.sinh(2 * a * scaled_sample_points_plot * r_ij) / (2 * a * r_ij) * scaled_sample_points_plot
 
-    plt.plot(r_plot, rho, 'r-', lw=2, label=r'$\rho(r)$')
-    plt.plot(r_plot, rho_tilde, 'k-', lw=2, label=r'$\tilde\rho(r)$')
+    plt.plot(scaled_sample_points_plot, rho, 'r-', lw=2, label=r'$\rho(r)$')
+    plt.plot(scaled_sample_points_plot, rho_tilde, 'k-', lw=2, label=r'$\tilde\rho(r)$')
 
     plt.title("Legendre DVR Expansion")
     plt.xlabel('r')
@@ -173,7 +185,8 @@ if __name__ == '__main__1':
 
 def coefficient(origin_atom, r_ij, one_over_2_sigma_squared, n, l, m, r_cutoff, DVR_BASIS_NUM):
     theta, phi = cartesian_to_spherical(*r_ij, np.linalg.norm(r_ij))
-    return (4 * np.pi * Y_lm_real_scipy(l, m, theta, phi) # be careful the order of theta and phi
+
+    return (4 * np.pi * Y_lm_real_scipy(l, m, theta, phi)
             * np.exp(-one_over_2_sigma_squared * np.sum(r_ij ** 2))
             * I_nl_ij_dvr(n, l, r_cutoff, one_over_2_sigma_squared, r_ij, DVR_BASIS_NUM))
 
@@ -189,3 +202,4 @@ def Y_bar_l_m(l, m, theta, phi):
         return SQRT_2 * P_bar_l_m(l, -m, theta) * np.sin(-m * phi)
     else:
         return P_bar_l_m(l, 0, theta)
+
