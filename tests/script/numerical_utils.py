@@ -21,9 +21,10 @@ def spherical_integral(f_cartesion, real_spherical_harmonics, config:Configurati
     x, y, z = config.LEBEDEV_POINTS * r  # scaled sample points
     values = f_cartesion(x, y, z) * real_spherical_harmonics(config.LEBEDEV_THETA, config.LEBEDEV_PHI)
     sphere_integral = np.sum(config.LEBEDEV_WEIGHTS * values)
-    x_mapped = (r / (config.CUT_OFF / 2)) - 1  # inverse mapping
-    result = dvr_basis_function(n, x_mapped, config.N_MAX)
+    # x_mapped = (r / (config.CUT_OFF / 2)) - 1  # inverse mapping
+    result = dvr_basis_function(n, r, config.N_MAX)
     return sphere_integral * r ** 2 * result * config.CUT_OFF / 2
+    # return sphere_integral * r ** 2 * result
 
 
 # Orthonormal Legendre polynomial function on [-1, 1]
@@ -48,23 +49,47 @@ def project_density_to_basis(density_fun, real_spherical_harmonics, config, n):
     return integral
 
 
-def trans_invariant_density_fun(atom_positions, config, smooth_coefficients):
-    relative_distances = atom_positions - atom_positions[config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+def trans_invariant_density_fun(atom_positions, config):
+    # relative_distances = atom_positions - atom_positions[config.ORIGIN_ATOM_INDEX]  # shape = (N, 2), N means #atoms, 2 means relative distance of (x and y)
+    relative_distances = atom_positions
     # NB: r must be an array
     relative_xs = relative_distances[:, 0]
     relative_ys = relative_distances[:, 1]
     relative_zs = relative_distances[:, 2]
+    # Now there is no normalization constant!!!
     total_result = [
-        lambda x, y, z, rx=rx, ry=ry, rz=rz, sigma=sigma, pf=1 / (-2 * sigma ** 2), smooth_coefficient=smooth_coeff: (
-                smooth_coefficient # * (config.ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
-                * np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 + (z - rz) ** 2))
+        lambda x, y, z, rx=rx, ry=ry, rz=rz, sigma=sigma, pf=1 / (-2 * sigma ** 2): (
+                # * (config.ONE_OVER_TWO_PI_POWER_3DIV2 / np.power(sigma, 3))
+                np.exp(pf * ((x - rx) ** 2 + (y - ry) ** 2 + (z - rz) ** 2))
         )
-        for rx, ry, rz, sigma, smooth_coeff
-        in zip(relative_xs, relative_ys, relative_zs, config.SIGMAS, smooth_coefficients)
-        if not (rx == 0 and ry == 0 and rz == 0)  # ignore the origin atom
+        for rx, ry, rz, sigma
+        in zip(
+            relative_xs,
+            relative_ys,
+            relative_zs,
+            config.SIGMAS)
     ]
 
     return lambda x, y, z: np.sum([gaussian_fun(x, y, z) for gaussian_fun in total_result], axis=0)
+
+def trans_invariant_density_fun_NEW(atom_positions, config):
+    relative_distances = atom_positions
+    # NB: r must be an array
+    # Now there is no normalization constant!!!
+
+    def total_result(x, y, z):
+        r = np.array([x, y, z]).T
+        a = 1 / (-2 * config.SIGMAS**2)
+        return np.sum(
+                    np.exp(
+                    a[:, None] * np.sum(
+                        (r[None] - relative_distances[:, None])**2,
+                        axis=-1
+                        )
+                    ),
+                axis=0)
+
+    return total_result
 
 
 # Original density function (sum of Gaussians centered at atoms)

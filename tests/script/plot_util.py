@@ -1,0 +1,120 @@
+from matplotlib import pyplot as plt
+import numpy as np
+
+from tests.script import utils_ext
+
+
+def plot_power_spectrum(power_spectrum, plot_max_l=6):
+    bar_width = 0.3
+    gap = 0.2
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    l_values = list(range(plot_max_l + 1))
+    x_positions = np.array(l_values) * (1 + gap)
+    powers = [power_spectrum.get(l, 0) for l in l_values]
+
+    ax.bar(x_positions, powers, bar_width, label='Power Spectrum')
+
+    ax.set_xlabel('l')
+    ax.set_ylabel('Power Spectrum \( P_{nl} \)')
+    ax.set_title('Power Spectrum of Spherical Harmonics Coefficients')
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(l_values)
+    ax.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+def plot_power_spectrum_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
+    # Calculate aggregated power spectrum for both sets
+    power_before = utils_ext.calculate_aggregated_power_spectrum(coeffs_before, total_l)
+    power_after = utils_ext.calculate_aggregated_power_spectrum(coeffs_after, total_l)
+
+    # Prepare data for plotting, use only the first max_l + 1 l
+    l_values = list(range(max_l + 1))
+    powers_before = [power_before.get(l, 0) for l in l_values]
+    powers_after = [power_after.get(l, 0) for l in l_values]
+
+    # Set up subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+
+    # Plot before rotation
+    x_positions = np.array(l_values) * 1.1
+    ax1.bar(x_positions, powers_before, 0.5, label='Power Spectrum')
+    ax1.set_xlabel('l')
+    ax1.set_ylabel('Aggregated Power Spectrum \( P_l \)')
+    ax1.set_title('Before Rotation')
+    ax1.set_xticks(x_positions)
+    ax1.set_xticklabels(l_values)
+    ax1.legend()
+
+    # Plot after rotation
+    ax2.bar(x_positions, powers_after, 0.5, label='Power Spectrum')
+    ax2.set_xlabel('l')
+    ax2.set_title('After Rotation')
+    ax2.set_xticks(x_positions)
+    ax2.set_xticklabels(l_values)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_coefficients(coefficients, max_l=6, total_l=20):
+    # Prepare data
+    l_values = list(range(total_l + 1))  # Calculate all l from 0 to 20
+    m_values_by_l = {l: [] for l in l_values}
+    coeff_values_by_l = {l: [] for l in l_values}
+
+    # Extract and aggregate coefficients by summing over all n
+    coeff_sum = {}  # Store the sum of coefficients for each (l, m)
+    for (n, l, m), coeff in coefficients.items():
+        if l <= total_l:
+            key = (l, m)
+            if key not in coeff_sum:
+                coeff_sum[key] = 0
+            coeff_sum[key] += coeff  # Accumulate coefficients for the same (l, m) across all n
+
+    # Organize data, use only the first max_l + 1 l for plotting
+    for (l, m), coeff in coeff_sum.items():
+        if l <= max_l:  # Process only l within plotting range
+            m_values_by_l[l].append(m)
+            coeff_values_by_l[l].append(coeff)
+
+    # Set bar plot parameters
+    bar_width = 0.5  # Increased bar width
+    gap = 0.1  # Reduced gap between l values
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # Plot bars for the first max_l + 1 l values
+    for i, l in enumerate(l_values[:max_l + 1]):  # Plot only the first 6 l
+        m_vals = np.array(m_values_by_l[l])
+        coeffs = np.array(coeff_values_by_l[l])
+        if len(m_vals) == 0:
+            continue
+        # Calculate x positions with gaps
+        x_positions = m_vals + (i * (2 * max_l + 1 + gap))
+        ax.bar(x_positions, coeffs, bar_width, label=f'l={l}')
+
+    # Set plot properties
+    ax.set_xlabel('m')
+    ax.set_ylabel('Summed Coefficient Magnitude')
+    ax.set_title('Aggregated Spherical Harmonics Coefficients by l and m (First 6 l)')
+    ax.legend()
+
+    # Adjust x-axis ticks
+    all_m_positions = []
+    all_m_labels = []
+    for i, l in enumerate(l_values[:max_l + 1]):
+        m_range = np.arange(-l, l + 1)
+        x_pos = m_range + (i * (2 * max_l + 1 + gap))
+        all_m_positions.extend(x_pos)
+        all_m_labels.extend([str(m) for m in m_range])
+
+    ax.set_xticks(all_m_positions)
+    ax.set_xticklabels(all_m_labels, rotation=45)
+
+    plt.tight_layout()
+    plt.show()

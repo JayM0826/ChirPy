@@ -1,4 +1,5 @@
 from pathlib import Path
+from time import time
 
 import chirpy as cp
 import numpy as np
@@ -6,6 +7,7 @@ from numpy.polynomial.legendre import leggauss
 from scipy.integrate import simpson as simps
 from scipy.spatial.transform import Rotation as R
 from scipy.special import legendre
+from scipy.special import roots_legendre
 
 import analytical_utils as ana_utils
 import numerical_utils as num_utils
@@ -24,7 +26,7 @@ def test_spherical_integral():
 
     # Define the integrand
     k = 2 * a * r * rij
-    integrand = sp.exp(-k * sp.cos(theta)) * sp.sin(theta)
+    integrand = sp.exp(-k * sp.cos(theta)) * sp.sin(theta) #   * sp.exp(-a * (r**2+rij ** 2))
 
     # First integrate over theta
     theta_integral = sp.integrate(integrand, (theta, 0, sp.pi))
@@ -37,7 +39,7 @@ def test_spherical_integral():
 
     # Print result
     sp.pprint(total_integral, use_unicode=True)
-test_spherical_integral()
+# test_spherical_integral()
 
 def testYlm():
     SQRT_2 = 1.0 / np.sqrt(2)
@@ -310,57 +312,226 @@ def test_density_fun_with_numerical_coefficients():
 # test_density_fun_with_numerical_coefficients()
 
 def test_density_fun_with_analytical_coefficients():
-    coordinates = [
+    # coordinates = [
+    #     [0.0, 0.0, 0.0],
+    #     [0.804, -0.310, 0.107],
+    #     [0.085, 0.804, 0.607],
+    #     [0.889, 0.494, 0.714]
+    # ]
+    #
+    # frame_1 = np.array(coordinates, dtype=np.float64)
+    #
+    # sigmas = utils_ext.get_sigmas(frame_1)
+    # config = Configuration()
+    # config.SIGMAS = sigmas
+    # first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
+    #                                                                                       config.ORIGIN_ATOM_INDEX,
+    #                                                                                       config.CUT_OFF)
+    #
+    # analytical_density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config,
+    #                                                                smooth_coefficients)
+    #
+    # coefficients = ana_utils.compute_coefficients_in_dict([frame_1], sigmas, config)
+    #
+    # # coefficients = num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
+    #
+    # xv, yv, zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(frame_1, sigmas, 20, 3, 0)
+    #
+    # analytical_function_values = analytical_density_fun(xv, yv, zv)
+    #
+    # numerical_density_fun = 1
+    # r = np.sqrt(xv ** 2 + yv ** 2 + zv ** 2) # ????
+    # thetas, phis = utils_ext.cartesian_to_spherical(xv, yv, zv, r)
+    #
+    # psi = np.zeros_like(xv, dtype=np.float64)
+    # for n in range(config.N_MAX):
+    #     for l, m in l_m_pairs(config.L_MAX):
+    #         # Get coefficient for (n, l, m)
+    #         c_nlm = coefficients.get((n, l, m), 0.0)
+    #         # Compute radial and angular parts
+    #         # x = 2 * r / config.CUT_OFF - 1  # map r in [0, rc] to x in [-1, 1]
+    #         R_n = ana_utils.dvr_basis_function(n, r, config.N_MAX)
+    #         Y_lm = num_utils.Y_lm_real_scipy(l, m, thetas, phis)
+    #         # Add contribution to total function
+    #         psi += c_nlm * R_n * Y_lm
+    #
+    # diff = analytical_function_values - psi
+    # count = np.sum(abs(diff) > 0.5)
+    # print(f"Number of elements in diff > 0.1: {count}")
+    # # print(diff[diff>0.1])
+    # assert np.allclose(analytical_function_values, psi, 1e-2, 1e-2), "coefficients not equal"
+
+    frame = np.array([
         [0.0, 0.0, 0.0],
+        # [0.000, 0.000, 1.000],
+        # [0.000, 1.000, 0.000],
+        # [1.000, 0.000, 0.000],
         [0.804, -0.310, 0.107],
         [0.085, 0.804, 0.607],
         [0.889, 0.494, 0.714]
-    ]
+    ])
 
-    frame_1 = np.array(coordinates, dtype=np.float64)
+    # frame = np.array(coordinates, dtype=np.float64)
 
-    sigmas = utils_ext.get_sigmas(frame_1)
+    # exclude origin atom from len
+    sigmas = np.ones(len(frame) - 1) * 0.25
+
     config = Configuration()
     config.SIGMAS = sigmas
-    first_frame_within_cutoff, smooth_coefficients = utils_ext.filter_atoms_within_cutoff(frame_1,
-                                                                                          config.ORIGIN_ATOM_INDEX,
-                                                                                          config.CUT_OFF)
 
-    analytical_density_fun = num_utils.trans_invariant_density_fun(first_frame_within_cutoff, config,
-                                                                   smooth_coefficients)
+    # SJ CHANGED CODE: frame_within_cutoff contains RELATIVE distances
+    frame_within_cutoff = utils_ext.filter_atoms_within_cutoff(
+        frame,
+        config.ORIGIN_ATOM_INDEX,
+        config.CUT_OFF
+    )
 
-    coefficients = ana_utils.compute_coefficients_in_dict([frame_1], sigmas, config)
+    s = time()
+    xv, yv, zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(
+        frame, sigmas, 5, config.CUT_OFF, 0)
+    dx = xv[1, 0, 0] - xv[0, 0, 0]
+    dy = yv[0, 1, 0] - yv[0, 0, 0]
+    dz = zv[0, 0, 1] - zv[0, 0, 0]
+    print("dx", dx)
+    print("generate_grid_and_bounds", time() - s)
 
-    # coefficients = num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
+    s = time()
+    analytical_density_fun = num_utils.trans_invariant_density_fun(
+        frame_within_cutoff,
+        config
+    )
+    print("trans_invariant_density_fun", time() - s)
 
-    xv, yv, zv, xyz_bounds, R_x, R_y, R_z = utils_ext.generate_grid_and_bounds(frame_1, sigmas, 20, 3, 0)
+    if False:
+        # ----- NEW CODE (no significant speedup for 4 atom, maybe for more?)
+        s = time()
+        analytical_density_fun_NEW = trans_invariant_density_fun_NEW(
+            frame_within_cutoff,
+            config,
+            smooth_coefficients
+        )
+        analytical_density_fun_NEW(R_x, R_y, R_z)
+        print(time() - s)
 
+        assert np.allclose(analytical_density_fun(R_x, R_y, R_z),
+                           analytical_density_fun_NEW(R_x, R_y, R_z)), "FAIL"
+        # ---- END OF TESTING NEW CODE
+
+    s = time()
+    coefficients = ana_utils.compute_coefficients_in_dict([frame_within_cutoff], config)
+    print("compute_coefficients_in_dict", time() - s)
+
+    #     for _l in range(config.L_MAX+1):
+    #         for _m in range(-_l, _l + 1):
+    #             _clm = 0.
+    #             for _n in range(config.DVR_BASIS_NUM):
+    #                 _clm += coefficients[(_n, _l, _m)]
+    #             plt.bar((2*(_l-1) + 1) + (2*_l+1)+_m, _clm)
+    #     plt.show()
+    #
+    # exit(0)
+
+    # coefficients = \
+    # num_utils.compute_coefficients_in_dict(analytical_density_fun, config)
+
+    s = time()
     analytical_function_values = analytical_density_fun(xv, yv, zv)
+    print("analytical_density_fun", time() - s)
 
     numerical_density_fun = 1
-    r = np.sqrt(xv ** 2 + yv ** 2 + zv ** 2)
+    print(xv.shape)
+    s = time()
+    r = np.sqrt(xv ** 2 + yv ** 2 + zv ** 2)  # ????
     thetas, phis = utils_ext.cartesian_to_spherical(xv, yv, zv, r)
+    x = 2 * r / config.CUT_OFF - 1  # map r in [0, rc] to x in [-1,1]
+    print("numerical density init", time() - s)
 
-    psi = np.zeros_like(xv, dtype=np.float64)
-    for n in range(config.N_MAX):
-        for l, m in l_m_pairs(config.L_MAX):
-            # Get coefficient for (n, l, m)
-            c_nlm = coefficients.get((n, l, m), 0.0)
-            # Compute radial and angular parts
-            x = 2 * r / config.CUT_OFF - 1  # map r in [0, rc] to x in [-1, 1]
-            R_n = ana_utils.dvr_basis_function(n, x, config.N_MAX)
-            Y_lm = num_utils.Y_lm_real_scipy(l, m, thetas, phis)
-            # Add contribution to total function
-            psi += c_nlm * R_n * Y_lm
+    s = time()
+
+    # --- chirpy parallel processing
+    _nlm = np.array([(_n, _l, _m)
+                     for _n in range(config.N_MAX + 1)
+                     for _l in range(config.L_MAX + 1)
+                     for _m in range(-_l, _l + 1)
+                     ])
+
+    x_nodes, w_weights = roots_legendre(config.DVR_BASIS_NUM)
+
+    # Map nodes from [-1, 1] to [0, r_cutoff]
+    r_vals = 0.5 * config.CUT_OFF * (x_nodes + 1)  # shape: (N,)
+
+    def _func(nlm):
+        _n, _l, _m = nlm
+        c_nlm = coefficients.get((_n, _l, _m), 0.0)
+        R_n = ana_utils.dvr_basis_function(_n, x, config.DVR_BASIS_NUM)
+        # --- renormalisation of DVR basis (just as the weights)
+        R_n /= r_vals[_n] * np.sqrt(config.CUT_OFF / 2.)
+        Y_lm = Y_lm_real_scipy(_l, _m, thetas, phis)
+        return c_nlm * R_n * Y_lm
+
+    JOB = cp.core.PALARRAY(_func,
+                           _nlm,
+                           n_cores=6
+                           )
+    S = JOB.run()
+    print(S.shape)
+    psi = S.sum(axis=0)
+    # --- serial code
+    # psi = np.zeros_like(xv, dtype=np.float64)
+    # for _n in tqdm.tqdm(range(config.N_MAX+1)):
+    #     for _l, _m in l_m_pairs(config.L_MAX):
+    #         # Get coefficient for (n, l, m)
+    #         c_nlm = coefficients.get((_n, _l, _m), 0.0)
+    #         # Compute radial and angular parts
+    #         R_n = dvr_basis_function(_n, x, config.DVR_BASIS_NUM)
+    #         Y_lm = Y_lm_real_scipy(_l, _m, thetas, phis)
+    #         # Add contribution to total function
+    #         psi += c_nlm * R_n * Y_lm
+    #         # --- if radial part disabled:
+    #         # psi += c_nlm * Y_lm
+    #         # OR:
+    #         # psi += c_nlm * Y_lm  * np.exp(-r**2/(2 * 0.5**2))
+
+    print("calculate psi", time() - s)
+
+    # --- clean from noise at boundaries
+    _ind = analytical_function_values >= 1.E-4
+    psi[~_ind] *= 0.0
+
+    # --- quick an dirty chirpy test
+    cp.volume.ScalarField(
+        data=analytical_function_values,
+        cell_vec_aa=np.array([[dx, 0., 0.],
+                              [0., dy, 0.],
+                              [0., 0., dz]]),
+        pos_aa=frame,
+        numbers=len(frame) * [1, ],
+        origin_aa=np.array([xv, yv, zv])[0, 0, 0],
+    ).write("reference.cube")
+
+    cp.volume.ScalarField(
+        data=psi,
+        cell_vec_aa=np.array([[dx, 0., 0.],
+                              [0., dy, 0.],
+                              [0., 0., dz]]),
+        pos_aa=frame,
+        numbers=len(frame) * [1, ],
+        origin_aa=np.array([xv, yv, zv])[0, 0, 0],
+    ).write("test.cube")
+
+    # --- end chirpy test
 
     diff = analytical_function_values - psi
-    count = np.sum(abs(diff) > 0.1)
-    print(f"Number of elements in diff > 0.1: {count}")
+    count = np.sum(abs(diff[_ind]) / analytical_function_values[_ind] > 0.05)
+    print(f"Number of elements with rel diff > 0.05: {count} = "
+          f"{count / np.sum(_ind) * 100}%")
     # print(diff[diff>0.1])
-    assert np.allclose(analytical_function_values, psi, 1e-2, 1e-2), "coefficients not equal"
+    assert np.allclose(analytical_function_values,
+                       psi, 1e-2, 1e-2), "coefficients not equal"
 
+if __name__ == '__main__':
 
-# test_density_fun_with_analytical_coefficients()
+    test_density_fun_with_analytical_coefficients()
 
 
 def test_scaled_DVR_orthogonality():
@@ -418,3 +589,51 @@ def test_scaled_DVR_orthogonality():
             overlap_mapped[m, n] = simps(chi_mapped[m] * chi_mapped[n], x_dense_mapped)
 
     print(overlap_std, overlap_mapped)
+
+# test_scaled_DVR_orthogonality()
+
+
+
+def test_discrete_orthogonal():
+    from scipy.special import eval_legendre, roots_legendre
+
+    # Parameters
+    N = 6  # Number of DVR basis functions
+    a, b = 1.0, 5.0  # New interval
+    jacobian_norm = np.sqrt((b - a) / 2)  # sqrt(1.5)
+    # Original Gauss-Legendre nodes and weights on [-1, 1]
+    x_nodes_std, w_std = roots_legendre(N)
+
+    # Mapping to [a, b]
+    x_nodes_mapped = 0.5 * (b - a) * x_nodes_std + 0.5 * (b + a)
+    weight_scaled = 0.5 * (b - a) * w_std
+
+    # Normalized Legendre polynomial φ_n(x) on [-1, 1]
+    def phi_n(n, x):
+        norm = np.sqrt((2 * n + 1) / 2)
+        return norm * eval_legendre(n, x)
+
+    # Construct DVR basis function ψ_j(x) in [-1, 1]
+    def dvr_basis_function(j, x_eval, N):
+        x_nodes, w_nodes = roots_legendre(N)
+        return sum(
+            phi_n(n, x_eval) * phi_n(n, x_nodes[j])
+            for n in range(N)
+        ) * np.sqrt(w_nodes[j])  / jacobian_norm
+
+    # Evaluate DVR basis functions ψ_j(x) at Gauss-Legendre points x_nodes_std
+    # Note: Even though the final integration is over [a, b], DVR is defined on [-1, 1]
+    psi_matrix = np.zeros((N, N))
+    for j in range(N):
+        psi_matrix[j, :] = dvr_basis_function(j, x_nodes_std, N)
+
+    # Construct overlap matrix in mapped interval using Jacobian-scaled weights
+    S_dvr_mapped = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            S_dvr_mapped[i, j] = np.sum(weight_scaled * psi_matrix[i, :] * psi_matrix[j, :])
+
+    print(S_dvr_mapped)
+
+
+# test_discrete_orthogonal()

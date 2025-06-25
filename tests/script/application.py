@@ -14,6 +14,9 @@ import configuration
 import utils_ext
 from chirpy.classes.volume import ScalarField
 
+from tests.script import plot_util
+
+
 class Application:
 
     default_config = configuration.Configuration()
@@ -78,10 +81,15 @@ class Application:
         print(system.data.shape)
 
         frame_1 = system.data[0][:, 0:3]
-        sigmas = utils_ext.get_sigmas(frame_1)
+        sigmas = utils_ext.get_sigmas(frame_1) * 0.25
         self.config.SIGMAS = sigmas
-        coefficients = ana_utils.compute_coefficients_in_sequence(system.data, sigmas, self.config)
-        utils_ext.print_format_nlm_coefficients(coefficients, self.config.N_MAX, self.config.L_MAX)
+        coefficients = ana_utils.compute_coefficients_in_dict(system.data, self.config)
+        # utils_ext.print_format_nlm_coefficients(coefficients, self.config.N_MAX, self.config.L_MAX)
+        utils_ext.plot_coefficients(coefficients)
+
+        power_spectrum = utils_ext.calculate_aggregated_power_spectrum(coefficients)
+        plot_util.plot_power_spectrum(power_spectrum, 6)
+
         return coefficients
 
 if __name__ == '__main__':

@@ -103,19 +103,43 @@ def get_relative_path(BASE_PATH, *path_segments):
     return BASE_PATH.joinpath(*path_segments).resolve()
 
 
-def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance, cutoff,
-                             origin_index):
+def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance,
+                             cutoff, origin_index):
     """
        number_per_unit_distance: the grid number per unit distance
     """
     # xyz_bounds = [x_lower, x_upper, y_lower, y_upper, z_lower, z_upper]
-    xyz_bounds = coupute_XYZ_bounds(atom_positions, sigmas, cutoff, origin_index)
-    x_linspace = np.linspace(xyz_bounds[0], xyz_bounds[1], (xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
-    y_linspace = np.linspace(xyz_bounds[2], xyz_bounds[3], (xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
-    z_linspace = np.linspace(xyz_bounds[4], xyz_bounds[5], (xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
+    xyz_bounds = coupute_XYZ_bounds(
+            atom_positions,
+            sigmas,
+            cutoff,
+            origin_index
+            )
+    x_linspace = np.linspace(
+            xyz_bounds[0],
+            xyz_bounds[1],
+            int((xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
+            )
+    y_linspace = np.linspace(
+            xyz_bounds[2],
+            xyz_bounds[3],
+            int((xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
+            )
 
-    x_meshgrid, y_meshgrid, z_meshgrid = np.meshgrid(x_linspace, y_linspace, z_linspace, indexing='ij')
-    return x_meshgrid, y_meshgrid, z_meshgrid, xyz_bounds, x_linspace, y_linspace, z_linspace
+    z_linspace = np.linspace(
+            xyz_bounds[4],
+            xyz_bounds[5],
+            int((xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
+            )
+
+    x_meshgrid, y_meshgrid, z_meshgrid = np.meshgrid(
+            x_linspace,
+            y_linspace,
+            z_linspace,
+            indexing='ij'
+            )
+    return (x_meshgrid, y_meshgrid, z_meshgrid, xyz_bounds, x_linspace,
+            y_linspace, z_linspace)
 
 
 def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
@@ -133,18 +157,37 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
     if cutoff != np.inf:
         x_upper, y_upper, z_upper = cutoff, cutoff, cutoff,
         x_lower, y_lower, z_lower = - cutoff, - cutoff, - cutoff
-        return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
-
+        return (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper)
+#        return tuple(int(math.ceil(x)) for x in (
+#                                                 x_lower,
+#                                                 x_upper,
+#                                                 y_lower,
+#                                                 y_upper,
+#                                                 z_lower,
+#                                                 z_upper
+#                                                 ))
+#
     # otherwise
-    atom_3D_relative_positions = atom_3D_positions - atom_3D_positions[origin_atom_index]
+    atom_3D_relative_positions = atom_3D_positions - atom_3D_positions[
+            origin_atom_index
+            ]
 
     max_values = np.max((atom_3D_relative_positions), axis=0)
     min_values = np.min((atom_3D_relative_positions), axis=0)
-    # here we use 6(without scientific proof) sigma so that the accuracy is higher
+    # here we use 6(without scientific proof) sigma so that the accuracy
+    # is highe
     x_upper, y_upper, z_upper = max_values + np.max(sigmas) * 6
     x_lower, y_lower, z_lower = min_values - np.max(sigmas) * 6
     # easy to use linspace with int
-    return tuple(int(math.ceil(x)) for x in (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper))
+
+    return tuple(int(math.ceil(x)) for x in (
+                                             x_lower,
+                                             x_upper,
+                                             y_lower,
+                                             y_upper,
+                                             z_lower,
+                                             z_upper
+                                             ))
 
 
 def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
@@ -157,17 +200,26 @@ def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
     - cutoff: Cutoff radius (e.g., in Å).
 
     Returns:
-    - return a fully new filtered array of qualified atoms (including origin atom).
+    - return a fully new filtered array of qualified atoms
+      (including origin atom).
     """
-    origin_pos = positions[origin_atom_index]
-    relative_distance = np.sqrt(np.sum((positions - origin_pos) ** 2, axis=1))
-    qualified_indices = np.where(relative_distance <= (cutoff))[0]
+    # origin_pos = positions[origin_atom_index]
+    # relative_distance = np.sqrt(np.sum((positions-origin_pos) ** 2, axis=1))
+    relative_positions = np.delete(
+                            positions - positions[origin_atom_index],
+                            origin_atom_index,
+                            axis=0
+                            )
 
-    qualified_atom_positions = positions[qualified_indices]
-    # smooth_coefficients = smooth_function(relative_distance[qualified_indices], cutoff)
-    # TODO in fact there is no smooth if use the below code instead of the above line
-    smooth_coefficients = np.ones(len((qualified_atom_positions)))
-    return qualified_atom_positions, smooth_coefficients
+    # qualified_indices = np.where(relative_distance <= (cutoff))[0]
+    # qualified_atom_positions = positions[qualified_indices]
+
+    # SJ CHANGED CODE: return relative distances directly so we do not have to
+    # recompute them. smoothing routine needs to be updated
+    _selection = np.linalg.norm(relative_positions, axis=1) <= cutoff
+    qualified_atom_positions = relative_positions[_selection]
+
+    return qualified_atom_positions
 
 
 def smooth_function(relative_distance, cutoff):
@@ -356,3 +408,147 @@ def deprecated(reason):
             return func(*args, **kwargs)
         return wrapped
     return decorator
+
+
+# def compute_power_spectrum(coefficients_in_dict, max_l=20):
+#     # comment out code is the Eq.26 in the paper on representation env
+#     # # === Compute SOAP power spectrum p_{nn'l} ===
+#     # p_nn_l = np.zeros((n_max + 1, n_max + 1, l_max + 1))
+#     #
+#     # for l in range(l_max + 1):
+#     #     for n in range(n_max + 1):
+#     #         for np_ in range(n_max + 1):
+#     #             total = 0.0
+#     #             for m in range(-l, l + 1):
+#     #                 # m_idx = m + l
+#     #                 total += np.conj(c_nlm.get((n, l, m), 0.0) * c_nlm.get((np_, l, m), 0.0) )
+#     #             p_nn_l[n, np_, l] = total  # real because it’s a scalar product
+#     # return p_nn_l
+#
+#     # Prepare data
+#     l_values = list(range(max_l + 1))  # Calculate all l from 0 to 20
+#     m_values_by_l = {l: [] for l in l_values}
+#     coeff_values_by_l = {l: [] for l in l_values}
+#
+#     # Extract and aggregate coefficients by summing over all n
+#     coeff_sum = {}  # Store the sum of coefficients for each (l, m)
+#     for (n, l, m), coeff in coefficients_in_dict.items():
+#         if l <= max_l:
+#             key = (l, m)
+#             if key not in coeff_sum:
+#                 coeff_sum[key] = 0
+#             coeff_sum[key] += coeff  # Accumulate coefficients for the same (l, m) across all n
+#     return coeff_sum
+
+
+
+def calculate_aggregated_power_spectrum(coefficients, max_l=20):
+    # Calculate aggregated power spectrum summing over m and n for each l
+    power_by_l = {}
+    for (n, l, m), coeff in coefficients.items():
+        if l <= max_l:
+            if l not in power_by_l:
+                power_by_l[l] = 0
+            power_by_l[l] += coeff ** 2  # Sum over m and n
+    return power_by_l
+
+
+
+from sympy.physics.quantum.cg import Wigner3j
+
+def calculate_aggregated_bispectrum(coefficients, max_l=5, total_l=20):
+    """
+    Calculate the aggregated bispectrum summing over n for each l1, l2, l3 combination.
+
+    Args:
+        coefficients: Dictionary with (n, l, m) as key and coefficient value
+        max_l: Maximum l value to consider for bispectrum (default=5)
+        total_l: Maximum l value in coefficients (default=20)
+
+    Returns:
+        bispectrum: Dictionary with (l1, l2, l3) as key and bispectrum value
+    """
+    bispectrum = {}
+
+    # Aggregate coefficients over n for each (l, m)
+    coeff_sum = {}
+    for (n, l, m), coeff in coefficients.items():
+        if l <= total_l:
+            key = (l, m)
+            if key not in coeff_sum:
+                coeff_sum[key] = 0
+            coeff_sum[key] += coeff
+
+    # Compute bispectrum for all valid l1, l2, l3 combinations
+    for l1 in range(max_l + 1):
+        for l2 in range(max_l + 1):
+            for l3 in range(max_l + 1):
+                # Check triangular inequality: |l1 - l2| <= l3 <= l1 + l2 and l1 + l2 + l3 even
+                if (abs(l1 - l2) <= l3 <= l1 + l2) and ((l1 + l2 + l3) % 2 == 0):
+                    key = tuple(sorted([l1, l2, l3]))  # Sort for uniqueness
+                    if key not in bispectrum:
+                        bispectrum[key] = 0
+                    # Sum over m1, m2, m3 with m1 + m2 + m3 = 0
+                    for m1 in range(-l1, l1 + 1):
+                        for m2 in range(-l2, l2 + 1):
+                            m3 = -m1 - m2
+                            if abs(m3) <= l3:
+                                try:
+                                    wigner = Wigner3j(l1,  m1, l2, m2,  l3, m3).doit()
+                                    if wigner is not None:  # Check if 3j-symbol is valid
+                                        c1 = coeff_sum.get((l1, m1), 0)
+                                        c2 = coeff_sum.get((l2, m2), 0)
+                                        c3 = coeff_sum.get((l3, m3), 0)
+                                        bispectrum[key] += wigner * c1 * c2 * c3
+                                except ValueError:
+                                    continue  # Skip invalid 3j-symbol combinations
+
+    return bispectrum
+
+
+def calculate_similarity_metric(power_chi, power_chi_prime, max_l=20):
+    """
+    Calculate the similarity metric d(chi, chi') = sqrt(2 - 2 * p(chi) * p(chi')).
+
+    Args:
+        power_chi: Dictionary with l as key and power spectrum value for chi
+        power_chi_prime: Dictionary with l as key and power spectrum value for chi'
+        max_l: Maximum l value to consider (default=5)
+
+    Returns:
+        similarity: The computed similarity metric
+    """
+    # Extract power spectrum values for l from 0 to max_l
+    l_values = list(range(max_l + 1))
+    p_chi = np.array([power_chi.get(l, 0) for l in l_values])
+    p_chi_prime = np.array([power_chi_prime.get(l, 0) for l in l_values])
+
+    # Normalize to unit length
+    norm_chi = np.sqrt(np.sum(p_chi ** 2))
+    norm_chi_prime = np.sqrt(np.sum(p_chi_prime ** 2))
+    if norm_chi > 0:
+        p_chi = p_chi / norm_chi
+    if norm_chi_prime > 0:
+        p_chi_prime = p_chi_prime / norm_chi_prime
+
+    # Compute dot product
+    dot_product = np.dot(p_chi, p_chi_prime)
+
+    # Calculate similarity metric
+    similarity = np.sqrt(2 - 2 * dot_product)
+    return similarity
+
+
+def calculate_aggregated_power_spectrum(coefficients, max_l=20):
+    # Calculate aggregated power spectrum summing over m and n for each l
+    power_by_l = {}
+    for (n, l, m), coeff in coefficients.items():
+        if l <= max_l:
+            if l not in power_by_l:
+                power_by_l[l] = 0
+            power_by_l[l] += coeff ** 2  # Sum over m and n
+    return power_by_l
+
+
+
+

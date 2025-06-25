@@ -1,11 +1,10 @@
 from dataclasses import dataclass
+from pathlib import Path
+
 import numpy as np
 import scipy
 
-import utils_ext
-
-from pathlib import Path
-
+from utils_ext import cartesian_to_spherical
 
 
 @dataclass
@@ -25,16 +24,24 @@ class Configuration:
     NUMBER_PER_UNIT_DISTANCE: int = 5
     # base 0
     ORIGIN_ATOM_INDEX: int = 0
-    # CUT_OFF = 2. # unit angstrom: 10**(-10) m
-    CUT_OFF: float = 5.  # unit angstrom: 10**(-10) m
-    N_MAX: int = 7 # n = 0,1,2,3,4,5,6, base 0, it is different from the quantum mechanics num, here it does not have physical meaning.
-    L_MAX: int = N_MAX - 1 # l=0,1,2,3,4,5, here L can be larger than N_MAX, because N_MAX is not the quantum principle num as before. but here as a convention, L_MAX=N_MAX-1
+    # CUT_OFF = 2. # 1nit angstrom: 10**(-10) m
+    CUT_OFF: float = 1.8  # unit angstrom: 10**(-10) m
+    # n = 0,1,2,3,4,5,6, base 0,
+    # different from the quantum mechanics num, here it does not have
+    # physical meaning.
+    N_MAX: int = 20
+    # l=0,1,2,3,4,5, here L can be larger than N_MAX, because N_MAX
+    # is not the quantum principle num as before.
+    # but here as a convention, L_MAX=N_MAX-1
+    L_MAX: int = 20
+    DVR_BASIS_NUM = N_MAX+1  # for numerical radial basis
+    # Minimal value which can be evaluated with the spherical bessel function
+    SPHERICAL_BESSEL_FUNCTION_FTOL = 1e-6
+    BASE_PATH = Path(__file__).parent
+
+    # numerical spherical grid
     LEBEDEV_ORDER: int = 131
     LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
-    LEBEDEV_THETA, LEBEDEV_PHI = utils_ext.cartesian_to_spherical(*LEBEDEV_POINTS)
-    DVR_BASIS_NUM = N_MAX # for numerical radial basis
-    # Minimal value which can be evaluated with the spherical bessel function
-    SPHERICAL_BESSEL_FUNCTION_FTOL = 1e-5
-    BASE_PATH = Path(__file__).parent
+    LEBEDEV_THETA, LEBEDEV_PHI = cartesian_to_spherical(*LEBEDEV_POINTS)
 
 
