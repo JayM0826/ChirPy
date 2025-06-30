@@ -118,3 +118,77 @@ def plot_coefficients(coefficients, max_l=6, total_l=20):
 
     plt.tight_layout()
     plt.show()
+
+from matplotlib import cm
+def plot_bispectrum(bispectrum, max_l=5):
+    """
+    Plot the aggregated bispectrum values using subplots for each l.
+
+    Args:
+        bispectrum: Dictionary with (l, l1, l2) as key and bispectrum value
+        max_l: Maximum l value to consider for plotting (default=5)
+    """
+    # Prepare data for plotting
+    l_values = range(max_l + 1)
+    data = np.zeros((max_l + 1, max_l + 1, max_l + 1))
+    for (l, l1, l2), value in bispectrum.items():
+        if l <= max_l and l1 <= max_l and l2 <= max_l:
+            data[l, l1, l2] = value
+
+    # Create subplots for each l
+    fig, axes = plt.subplots(max_l + 1, 1, figsize=(10, 5 * (max_l + 1)), sharex=True, sharey=True)
+    if max_l == 0:
+        axes = [axes]  # Ensure axes is a list for single subplot case
+
+    for l in l_values:
+        ax = axes[l]
+        im = ax.imshow(data[l], cmap=cm.viridis, aspect='auto', extent=[-0.5, max_l + 0.5, -0.5, max_l + 0.5])
+        ax.set_title(f'L = {l}')
+        ax.set_xlabel('L2')
+        ax.set_ylabel('L1')
+        plt.colorbar(im, ax=ax, label='Bispectrum Value')
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_two_bispectra(bispectrum1, bispectrum2, max_l=5):
+    """
+    Plot two bispectra side by side for visual comparison.
+
+    Args:
+        bispectrum1: First bispectrum dictionary.
+        bispectrum2: Second bispectrum dictionary.
+        max_l: Maximum l value to consider.
+    """
+    l_values = range(max_l + 1)
+    data1 = np.zeros((max_l + 1, max_l + 1, max_l + 1))
+    data2 = np.zeros((max_l + 1, max_l + 1, max_l + 1))
+
+    for (l, l1, l2), value in bispectrum1.items():
+        if l <= max_l and l1 <= max_l and l2 <= max_l:
+            data1[l, l1, l2] = value
+
+    for (l, l1, l2), value in bispectrum2.items():
+        if l <= max_l and l1 <= max_l and l2 <= max_l:
+            data2[l, l1, l2] = value
+
+    fig, axes = plt.subplots(max_l + 1, 2, figsize=(12, 4 * (max_l + 1)), sharex=True, sharey=True)
+
+    for l in l_values:
+        im1 = axes[l, 0].imshow(data1[l], cmap=cm.viridis, aspect='auto',
+                                extent=[-0.5, max_l + 0.5, -0.5, max_l + 0.5])
+        axes[l, 0].set_title(f'Bispectrum 1 — L = {l}')
+        axes[l, 0].set_xlabel('L2')
+        axes[l, 0].set_ylabel('L1')
+        plt.colorbar(im1, ax=axes[l, 0])
+
+        im2 = axes[l, 1].imshow(data2[l], cmap=cm.viridis, aspect='auto',
+                                extent=[-0.5, max_l + 0.5, -0.5, max_l + 0.5])
+        axes[l, 1].set_title(f'Bispectrum 2 — L = {l}')
+        axes[l, 1].set_xlabel('L2')
+        axes[l, 1].set_ylabel('L1')
+        plt.colorbar(im2, ax=axes[l, 1])
+
+    plt.tight_layout()
+    plt.show()

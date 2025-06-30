@@ -1,5 +1,6 @@
 # built-in module
 import math as math
+from copy import deepcopy
 
 import chirpy
 import numpy as np
@@ -16,8 +17,7 @@ import warnings
 import functools
 
 
-
-def print_format_nlm_coefficients(coefficients, n_max,  l_max):
+def print_format_nlm_coefficients(coefficients, n_max, l_max):
     for n in range(n_max):
         print(f"{100 * '*'}n={n}: COEFFICIENTS{140 * '*'}")
         index_start = n * (l_max ** 2)
@@ -110,34 +110,34 @@ def generate_grid_and_bounds(atom_positions, sigmas, number_per_unit_distance,
     """
     # xyz_bounds = [x_lower, x_upper, y_lower, y_upper, z_lower, z_upper]
     xyz_bounds = coupute_XYZ_bounds(
-            atom_positions,
-            sigmas,
-            cutoff,
-            origin_index
-            )
+        atom_positions,
+        sigmas,
+        cutoff,
+        origin_index
+    )
     x_linspace = np.linspace(
-            xyz_bounds[0],
-            xyz_bounds[1],
-            int((xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
-            )
+        xyz_bounds[0],
+        xyz_bounds[1],
+        int((xyz_bounds[1] - xyz_bounds[0]) * number_per_unit_distance)
+    )
     y_linspace = np.linspace(
-            xyz_bounds[2],
-            xyz_bounds[3],
-            int((xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
-            )
+        xyz_bounds[2],
+        xyz_bounds[3],
+        int((xyz_bounds[3] - xyz_bounds[2]) * number_per_unit_distance)
+    )
 
     z_linspace = np.linspace(
-            xyz_bounds[4],
-            xyz_bounds[5],
-            int((xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
-            )
+        xyz_bounds[4],
+        xyz_bounds[5],
+        int((xyz_bounds[5] - xyz_bounds[4]) * number_per_unit_distance)
+    )
 
     x_meshgrid, y_meshgrid, z_meshgrid = np.meshgrid(
-            x_linspace,
-            y_linspace,
-            z_linspace,
-            indexing='ij'
-            )
+        x_linspace,
+        y_linspace,
+        z_linspace,
+        indexing='ij'
+    )
     return (x_meshgrid, y_meshgrid, z_meshgrid, xyz_bounds, x_linspace,
             y_linspace, z_linspace)
 
@@ -158,19 +158,19 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
         x_upper, y_upper, z_upper = cutoff, cutoff, cutoff,
         x_lower, y_lower, z_lower = - cutoff, - cutoff, - cutoff
         return (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper)
-#        return tuple(int(math.ceil(x)) for x in (
-#                                                 x_lower,
-#                                                 x_upper,
-#                                                 y_lower,
-#                                                 y_upper,
-#                                                 z_lower,
-#                                                 z_upper
-#                                                 ))
-#
+    #        return tuple(int(math.ceil(x)) for x in (
+    #                                                 x_lower,
+    #                                                 x_upper,
+    #                                                 y_lower,
+    #                                                 y_upper,
+    #                                                 z_lower,
+    #                                                 z_upper
+    #                                                 ))
+    #
     # otherwise
     atom_3D_relative_positions = atom_3D_positions - atom_3D_positions[
-            origin_atom_index
-            ]
+        origin_atom_index
+    ]
 
     max_values = np.max((atom_3D_relative_positions), axis=0)
     min_values = np.min((atom_3D_relative_positions), axis=0)
@@ -181,13 +181,13 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
     # easy to use linspace with int
 
     return tuple(int(math.ceil(x)) for x in (
-                                             x_lower,
-                                             x_upper,
-                                             y_lower,
-                                             y_upper,
-                                             z_lower,
-                                             z_upper
-                                             ))
+        x_lower,
+        x_upper,
+        y_lower,
+        y_upper,
+        z_lower,
+        z_upper
+    ))
 
 
 def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
@@ -206,10 +206,10 @@ def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
     # origin_pos = positions[origin_atom_index]
     # relative_distance = np.sqrt(np.sum((positions-origin_pos) ** 2, axis=1))
     relative_positions = np.delete(
-                            positions - positions[origin_atom_index],
-                            origin_atom_index,
-                            axis=0
-                            )
+        positions - positions[origin_atom_index],
+        origin_atom_index,
+        axis=0
+    )
 
     # qualified_indices = np.where(relative_distance <= (cutoff))[0]
     # qualified_atom_positions = positions[qualified_indices]
@@ -306,13 +306,11 @@ def print_banner(str):
     # ASCII title
     banner = pyfiglet.figlet_format(str)
 
-
     now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     python_version = platform.python_version()
     system_info = f"{platform.system()} {platform.release()} ({platform.machine()})"
     # cuda_status = "Available ✅" if torch.cuda.is_available() else "Not Available ❌"
     # device_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A"
-
 
     print(banner)
     print(f"{'=' * 60}")
@@ -338,15 +336,12 @@ def loading_step(name, success=True, delay=0.89):
     # -*- coding: utf-8 -*-
 
 
-
-
-
 def print_Gauss(path='Gauss.jpg', max_width=70):
     def rgb_to_ansi(r, g, b, char='  '):
         return f"\x1b[48;2;{r};{g};{b}m  \x1b[0m"
+
     img = Image.open(path)
     img = img.convert("RGB")
-
 
     w, h = img.size
     aspect_ratio = h / w
@@ -366,6 +361,7 @@ def l_m_pairs(l_max):
     generate (l, m) list of spherical harmonics
     """
     return [(l, m) for l in range(l_max) for m in range(-l, l + 1)]
+
 
 def n_l_m_pairs(n_max):
     """
@@ -396,8 +392,6 @@ def compute_cos_sin_angle_multiples(cos_phi, sin_phi, max_angular):
     return cos_sin_m_phi
 
 
-
-
 def deprecated(reason):
     def decorator(func):
         @functools.wraps(func)
@@ -406,7 +400,9 @@ def deprecated(reason):
                           category=DeprecationWarning,
                           stacklevel=2)
             return func(*args, **kwargs)
+
         return wrapped
+
     return decorator
 
 
@@ -441,7 +437,6 @@ def deprecated(reason):
 #     return coeff_sum
 
 
-
 def calculate_aggregated_power_spectrum(coefficients, max_l=20):
     # Calculate aggregated power spectrum summing over m and n for each l
     power_by_l = {}
@@ -453,57 +448,117 @@ def calculate_aggregated_power_spectrum(coefficients, max_l=20):
     return power_by_l
 
 
+import numpy as np
+from sympy.physics.quantum.cg import CG
+from sympy import S
+from itertools import product
 
-from sympy.physics.quantum.cg import Wigner3j
 
-def calculate_aggregated_bispectrum(coefficients, max_l=5, total_l=20):
+def clebsch_gordan(l1, l2, m1, m2, l, m):
+    result = CG(S(l1), S(m1), S(l2), S(m2), S(l), S(m)).doit()
+    return float(result) if result else 0.0
+
+
+# def compute_all_bispectra(cnlm_dict):
+#     """
+#     输入:
+#         cnlm_dict: dict[(n, l, m)] = float（实数）
+#     输出:
+#         bispectra_dict[(l, l1, l2)] = float
+#     """
+#
+#     # 提取所有 n、l 的值
+#     n_values = sorted(set(key[0] for key in cnlm_dict))
+#     l_values = sorted(set(key[1] for key in cnlm_dict))
+#
+#     bispectra_dict = {}
+#
+#     for l, l1, l2 in product(l_values, repeat=3):
+#         b_ll1l2_total = 0.0
+#
+#         for n in n_values:
+#             b_nll1l2 = 0.0
+#
+#             for m in range(-l, l + 1):
+#                 for m1 in range(-l1, l1 + 1):
+#                     for m2 in range(-l2, l2 + 1):
+#                         C = clebsch_gordan(l, l1, l2, m, m1, m2)
+#                         if C == 0.0:
+#                             continue
+#
+#                         key1 = (n, l, m)
+#                         key2 = (n, l1, m1)
+#                         key3 = (n, l2, m2)
+#
+#                         if key1 in cnlm_dict and key2 in cnlm_dict and key3 in cnlm_dict:
+#                             c1 = cnlm_dict[key1]
+#                             c2 = cnlm_dict[key2]
+#                             c3 = cnlm_dict[key3]
+#                             b_nll1l2 += c1 * C * c2 * c3
+#
+#             b_ll1l2_total += b_nll1l2
+#
+#         # 存储最终聚合后的 b_{l l1 l2}
+#         bispectra_dict[(l, l1, l2)] = b_ll1l2_total
+#
+#     return bispectra_dict
+
+def calculate_bispectrum(c_nlm: dict, l1: int, l2: int, l3: int,
+                         sum_over_n=True):
+    """proof of principle, needs more efficient code"""
+
+    if not sum_over_n:
+        # --- Todo: implement n-range selection
+        raise NotImplementedError("Please set sum_over_n=True")
+
+    n_values = sorted(set(_n for _n, _l, _m in c_nlm))
+
+    bl1l2l3 = 0.0
+    for _n in n_values:
+        for _m1 in range(-l1, l1 + 1):
+            for _m2 in range(-l2, l2 + 1):
+                M = _m1 + _m2
+                _m3 = -M
+                if not (-l3 <= _m3 <= l3):
+                    continue
+                _CG = CG(
+                    S(l1), S(_m1),
+                    S(l2), S(_m2),
+                    S(l3), S(M)
+                ).doit()
+                _N = CG(
+                    S(l3), S(M),
+                    S(l3), S(_m3),
+                    S(0), S(0)
+                ).doit()
+                if _CG != 0:
+                    bl1l2l3 += complex(_N * _CG) * c_nlm[(_n, l1, _m1)] * c_nlm[(_n, l2, _m2)] * c_nlm[(_n, l3, _m3)]
+
+    return bl1l2l3
+
+
+def calculate_aggregated_bispectrum(coefficients, max_plot_l=5, L_MAX=20):
     """
-    Calculate the aggregated bispectrum summing over n for each l1, l2, l3 combination.
+    Calculate the aggregated bispectrum summing over n for each l, l1, l2 combination.
 
     Args:
         coefficients: Dictionary with (n, l, m) as key and coefficient value
-        max_l: Maximum l value to consider for bispectrum (default=5)
-        total_l: Maximum l value in coefficients (default=20)
+        max_plot_l: Maximum l value to consider for bispectrum (default=5)
+        L_MAX: Maximum l value in coefficients (default=20)
 
     Returns:
-        bispectrum: Dictionary with (l1, l2, l3) as key and bispectrum value
+        bispectrum: Dictionary with (l, l1, l2) as key and aggregated bispectrum value over n
     """
-    bispectrum = {}
 
-    # Aggregate coefficients over n for each (l, m)
-    coeff_sum = {}
-    for (n, l, m), coeff in coefficients.items():
-        if l <= total_l:
-            key = (l, m)
-            if key not in coeff_sum:
-                coeff_sum[key] = 0
-            coeff_sum[key] += coeff
+    # Compute bispectrum for each n
 
-    # Compute bispectrum for all valid l1, l2, l3 combinations
-    for l1 in range(max_l + 1):
-        for l2 in range(max_l + 1):
-            for l3 in range(max_l + 1):
-                # Check triangular inequality: |l1 - l2| <= l3 <= l1 + l2 and l1 + l2 + l3 even
-                if (abs(l1 - l2) <= l3 <= l1 + l2) and ((l1 + l2 + l3) % 2 == 0):
-                    key = tuple(sorted([l1, l2, l3]))  # Sort for uniqueness
-                    if key not in bispectrum:
-                        bispectrum[key] = 0
-                    # Sum over m1, m2, m3 with m1 + m2 + m3 = 0
-                    for m1 in range(-l1, l1 + 1):
-                        for m2 in range(-l2, l2 + 1):
-                            m3 = -m1 - m2
-                            if abs(m3) <= l3:
-                                try:
-                                    wigner = Wigner3j(l1,  m1, l2, m2,  l3, m3).doit()
-                                    if wigner is not None:  # Check if 3j-symbol is valid
-                                        c1 = coeff_sum.get((l1, m1), 0)
-                                        c2 = coeff_sum.get((l2, m2), 0)
-                                        c3 = coeff_sum.get((l3, m3), 0)
-                                        bispectrum[key] += wigner * c1 * c2 * c3
-                                except ValueError:
-                                    continue  # Skip invalid 3j-symbol combinations
+    bispectrum_aggregated = {}
+    for l in range(max_plot_l + 1):
+        for l1 in range(max_plot_l + 1):
+            for l2 in range(max_plot_l + 1):
+                bispectrum_aggregated[(l, l1, l2)] = calculate_bispectrum(coefficients, l1, l2, l)
 
-    return bispectrum
+    return bispectrum_aggregated
 
 
 def calculate_similarity_metric(power_chi, power_chi_prime, max_l=20):
@@ -550,5 +605,86 @@ def calculate_aggregated_power_spectrum(coefficients, max_l=20):
     return power_by_l
 
 
+from scipy.special import eval_legendre, roots_legendre, sph_harm_y
 
 
+def Y_lm_real_scipy(l, m, theta, phi):
+    """
+    In SciPy sph_harm, the order is :
+        m,
+        l,
+        phi : array_like
+           Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        theta : array_like
+           Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
+
+    -------------------below is important---------------------------
+    the order and definition of parameters are the same as sympy
+    # In SciPy's sph_harm_y(here used)
+        the order is :
+        l,
+        m,
+        theta : ArrayLike[float]
+            Polar (colatitudinal) coordinate; must be in ``[0, pi]``.
+        phi : ArrayLike[float]
+            Azimuthal (longitudinal) coordinate; must be in ``[0, 2*pi]``.
+
+    theta = np.linspace(0, np.pi, 100)
+    phi = np.linspace(0, 2*np.pi, 100)
+    theta, phi = np.meshgrid(theta, phi)
+
+    Spherical harmonics. They are defined as
+
+    .. math::
+
+        Y_n^m(\theta,\phi) = \sqrt{\frac{2 n + 1}{4 \pi} \frac{(n - m)!}{(n + m)!}}
+            P_n^m(\cos(\theta)) e^{i m \phi}
+
+    where :math:`P_n^m` are the (unnormalized) associated Legendre polynomials.
+
+    Note that SciPy's spherical harmonics include the Condon-Shortley
+    phase [2]_ because it is part of `sph_legendre_p`.
+
+
+
+
+    f you need to derive formulas (for example, manually expanding a spherical wave), use sympy's Znm.
+    If you need to perform numerical computations (such as plotting molecular orbitals or doing acoustic simulations),
+    use the scipy version (the one that includes the (−1^m) factor!).
+    """
+    if m == 0:
+        return sph_harm_y(l, 0, theta, phi).real
+    elif m > 0:
+        return np.sqrt(2) * (-1) ** m * sph_harm_y(l, m, theta, phi).real  # Even
+    else:
+        return np.sqrt(2) * np.power(-1., m) * np.imag(sph_harm_y(l, -m, theta, phi))  # Odd
+    # Y = sph_harm_y(l, abs(m), theta, phi)
+    #
+    # # Linear combination of Y_l,m and Y_l,-m to create the real form.
+    # if m < 0:
+    #     Y = np.sqrt(2) * (-1.)**m * Y.imag
+    # elif m > 0:
+    #     Y = np.sqrt(2) * (-1.)**m * Y.real
+    # else:
+    #     Y = Y.real
+    # return Y
+
+
+# def reconstruct_density(coeff_in_dict, dvr_basis_funcs, config, r_vals, theta_vals, phi_vals, current_n, current_l):
+#     result = np.zeros_like(r_vals)
+#     for n in range(current_n + 1):
+#         R_n = dvr_basis_funcs(n, r_vals, config.DVR_BASIS_NUM)
+#         for l in range(current_l + 1):
+#             for m in range(-l, l + 1):
+#                 c_nlm = coeff_in_dict[(n, l, m)]
+#                 Y_lm = Y_lm_real_scipy(l, m, theta_vals, phi_vals)
+#                 result += c_nlm * R_n * Y_lm
+#     return result
+
+
+def numerical_density_at_nlm(c_nlm, dvr_basis_fun, config, r_nodes, x_vals, theta_vals, phi_vals, n, l, m):
+    R_n = dvr_basis_fun(n, x_vals, config.DVR_BASIS_NUM)
+    R_n /= r_nodes[n] * np.sqrt(config.CUT_OFF / 2.)
+    Y_lm = Y_lm_real_scipy(l, m, theta_vals, phi_vals)
+    return c_nlm * R_n * Y_lm

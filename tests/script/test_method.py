@@ -529,9 +529,9 @@ def test_density_fun_with_analytical_coefficients():
     assert np.allclose(analytical_function_values,
                        psi, 1e-2, 1e-2), "coefficients not equal"
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
 
-    test_density_fun_with_analytical_coefficients()
+    # test_density_fun_with_analytical_coefficients()
 
 
 def test_scaled_DVR_orthogonality():
@@ -637,3 +637,49 @@ def test_discrete_orthogonal():
 
 
 # test_discrete_orthogonal()
+import math
+from sympy import S
+def test_CG():
+    # List of test cases: (l, l1, l2, m, m1, m2, expected_value, description)
+    test_cases = [
+        # Test Case 1: Spin-1/2 coupling to l=1, m=1
+        (1, S(1) / 2, S(1) / 2, 1, S(1) / 2, S(1) / 2, 1.0,
+         "Spin-1/2 coupling to l=1, m=1, pure state"),
+
+        # Test Case 2: Spin-1/2 coupling to l=0, m=0
+        (0, S(1) / 2, S(1) / 2, 0, S(1) / 2, S(-1) / 2, math.sqrt(1 / 2),  # ≈ 0.7071067811865475
+         "Spin-1/2 coupling to l=0, m=0, singlet state"),
+
+        # Test Case 3: Invalid m conservation (m1 + m2 ≠ m)
+        (1, S(1) / 2, S(1) / 2, S(1) / 2, S(1) / 2, S(1) / 2, 0.0,
+         "Invalid: m1 + m2 = 1 ≠ m = 1/2"),
+
+        # Test Case 4: l1=1, l2=1, l=1, m=1
+        (1, 1, 1, 1, 1, 0, math.sqrt(1 / 2),  # ≈ 0.7071067811865475
+         "Integer momenta coupling to l=1, m=1"),
+
+        # Test Case 5: l1=1, l2=1, l=2, m=2
+        (2, 1, 1, 2, 1, 1, 1.0,
+         "Integer momenta coupling to l=2, m=2, pure state"),
+
+        # Test Case 6: Invalid triad (l > l1 + l2)
+        (3, 1, 1, 0, 0, 0, 0.0,
+         "Invalid: l=3 > l1 + l2 = 2"),
+
+        # Test Case 7: Spin-1/2 coupling to l=1, m=0
+        (1, S(1) / 2, S(1) / 2, 0, S(1) / 2, S(-1) / 2, math.sqrt(1 / 2),  # ≈ 0.7071067811865475
+         "Spin-1/2 coupling to l=1, m=0"),
+
+
+    ]
+
+    # Run and verify test cases
+    for i, (l, l1, l2, m, m1, m2, expected, desc) in enumerate(test_cases, 1):
+        result = utils_ext.clebsch_gordan(l1, l2, m1, m2, l, m)
+        # Allow small numerical tolerance for floating-point comparison
+        is_correct = abs(result - expected) < 1e-10
+        print(f"Test Case {i}: {desc}")
+        print(f"Input: l1={l1}, l2={l2}, l={l},  m={m}, m1={m1}, m2={m2}")
+        print(f"Calculated: {result:.10f}, Expected: {expected:.10f}, {'PASS' if is_correct else 'FAIL'}")
+        print()
+test_CG()
