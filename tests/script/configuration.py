@@ -29,19 +29,21 @@ class Configuration:
     # n = 0,1,2,3,4,5,6, base 0,
     # different from the quantum mechanics num, here it does not have
     # physical meaning.
-    N_MAX: int = 20
+    N_MAX: int = 6
     # l=0,1,2,3,4,5, here L can be larger than N_MAX, because N_MAX
     # is not the quantum principle num as before.
     # but here as a convention, L_MAX=N_MAX-1
-    L_MAX: int = 20
+    L_MAX: int = 10
     DVR_BASIS_NUM = N_MAX+1  # for numerical radial basis
     # Minimal value which can be evaluated with the spherical bessel function
     SPHERICAL_BESSEL_FUNCTION_FTOL = 1e-6
     BASE_PATH = Path(__file__).parent
 
     # numerical spherical grid
-    LEBEDEV_ORDER: int = 131
-    LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
-    LEBEDEV_THETA, LEBEDEV_PHI = cartesian_to_spherical(*LEBEDEV_POINTS)
+    # LEBEDEV_ORDER: int = 131
+    # LEBEDEV_POINTS, LEBEDEV_WEIGHTS = scipy.integrate.lebedev_rule(LEBEDEV_ORDER)
+    # LEBEDEV_THETA, LEBEDEV_PHI = cartesian_to_spherical(*LEBEDEV_POINTS)
+
+
 
 

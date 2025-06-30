@@ -4,27 +4,26 @@ import numpy as np
 from tests.script import utils_ext
 
 
-def plot_power_spectrum(power_spectrum, plot_max_l=6):
-    bar_width = 0.3
+def plot_power_spectrum(power_spectrum, max_l=6):
+    bar_width = 0.9
     gap = 0.2
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    l_values = list(range(plot_max_l + 1))
+    l_values = list(range(max_l + 1))
     x_positions = np.array(l_values) * (1 + gap)
     powers = [power_spectrum.get(l, 0) for l in l_values]
 
     ax.bar(x_positions, powers, bar_width, label='Power Spectrum')
 
-    ax.set_xlabel('l')
-    ax.set_ylabel('Power Spectrum \( P_{nl} \)')
-    ax.set_title('Power Spectrum of Spherical Harmonics Coefficients')
-    ax.set_xticks(x_positions)
-    ax.set_xticklabels(l_values)
+    ax.set_xlabel('l', fontsize=20)
+    ax.set_ylabel('Power Spectrum \( P_{nl} \)', fontsize=20)
+    ax.set_title('Power Spectrum of Spherical Harmonics Coefficients', fontsize=20)
+    ax.set_xticks(x_positions, fontsize=20)
+    ax.set_xticklabels(l_values, fontsize=20)
     ax.legend()
 
     plt.tight_layout()
     plt.show()
-
 
 
 def plot_power_spectrum_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
@@ -190,5 +189,26 @@ def plot_two_bispectra(bispectrum1, bispectrum2, max_l=5):
         axes[l, 1].set_ylabel('L1')
         plt.colorbar(im2, ax=axes[l, 1])
 
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_bispectra_path(keys_to_plot, bispectra_by_key, n_frames, title):
+    plt.figure(figsize=(10, 5))
+    frames = np.arange(1, n_frames + 1)  # base 1
+    for key in keys_to_plot:
+        values = bispectra_by_key[key]  # 直接使用，无需取 .real
+        label = rf"$B_{{{key[0]}{key[1]}{key[2]}}}$"
+        plt.plot(frames, values, marker='o', label=label)
+
+    # ✅ 添加水平 0 线
+    plt.hlines(0, 0, n_frames - 1, colors='k', linestyles='--', linewidth=1)
+
+    # ✅ 图形标签与样式
+    plt.xlabel("Frame Index")
+    plt.ylabel("Bispectrum Value")
+    plt.title(title)
+    plt.grid(True)
+    plt.legend()
     plt.tight_layout()
     plt.show()

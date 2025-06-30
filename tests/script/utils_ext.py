@@ -437,17 +437,6 @@ def deprecated(reason):
 #     return coeff_sum
 
 
-def calculate_aggregated_power_spectrum(coefficients, max_l=20):
-    # Calculate aggregated power spectrum summing over m and n for each l
-    power_by_l = {}
-    for (n, l, m), coeff in coefficients.items():
-        if l <= max_l:
-            if l not in power_by_l:
-                power_by_l[l] = 0
-            power_by_l[l] += coeff ** 2  # Sum over m and n
-    return power_by_l
-
-
 import numpy as np
 from sympy.physics.quantum.cg import CG
 from sympy import S
@@ -534,7 +523,9 @@ def calculate_bispectrum(c_nlm: dict, l1: int, l2: int, l3: int,
                 if _CG != 0:
                     bl1l2l3 += complex(_N * _CG) * c_nlm[(_n, l1, _m1)] * c_nlm[(_n, l2, _m2)] * c_nlm[(_n, l3, _m3)]
 
-    return bl1l2l3
+    if (abs(bl1l2l3.imag) > 1e-4):
+        print(l1, l2, l3)
+    return bl1l2l3.real
 
 
 def calculate_aggregated_bispectrum(coefficients, max_plot_l=5, L_MAX=20):
@@ -601,9 +592,8 @@ def calculate_aggregated_power_spectrum(coefficients, max_l=20):
         if l <= max_l:
             if l not in power_by_l:
                 power_by_l[l] = 0
-            power_by_l[l] += coeff ** 2  # Sum over m and n
+            power_by_l[l] += np.real(np.conjugate(coeff) * coeff)  # Sum over m and n
     return power_by_l
-
 
 from scipy.special import eval_legendre, roots_legendre, sph_harm_y
 
