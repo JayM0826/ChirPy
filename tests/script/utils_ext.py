@@ -360,7 +360,7 @@ def l_m_pairs(l_max):
     """
     generate (l, m) list of spherical harmonics
     """
-    return [(l, m) for l in range(l_max) for m in range(-l, l + 1)]
+    return [(l, m) for l in range(l_max + 1) for m in range(-l, l + 1)]
 
 
 def n_l_m_pairs(n_max):
@@ -370,7 +370,7 @@ def n_l_m_pairs(n_max):
     Maybe this method should be deleted!!!
     generate (n, l, m) list of spherical harmonics
     """
-    return [(n, l, m) for n in range(1, n_max) for l in range(n) for m in range(-l, l + 1)]
+    return [(n, l, m) for n in range(1, n_max + 1) for l in range(n) for m in range(-l, l + 1)]
 
 
 def compute_cos_sin_angle_multiples(cos_phi, sin_phi, max_angular):
@@ -523,9 +523,9 @@ def calculate_bispectrum(c_nlm: dict, l1: int, l2: int, l3: int,
                 if _CG != 0:
                     bl1l2l3 += complex(_N * _CG) * c_nlm[(_n, l1, _m1)] * c_nlm[(_n, l2, _m2)] * c_nlm[(_n, l3, _m3)]
 
-    if (abs(bl1l2l3.imag) > 1e-4):
+    if (abs(bl1l2l3.imag) > 1e-2):
         print(l1, l2, l3)
-    return bl1l2l3.real
+    return bl1l2l3
 
 
 def calculate_aggregated_bispectrum(coefficients, max_plot_l=5, L_MAX=20):

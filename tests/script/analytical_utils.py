@@ -1,16 +1,12 @@
-import numpy as np
-from scipy.special import lpmv, gamma, hyp1f1, spherical_in, eval_legendre, roots_legendre
-from numpy import pi
-from sympy.functions.combinatorial.factorials import factorial
-from numpy import sin, cos
-from scipy.integrate import quad
-
-
 from math import sqrt
 
+import numpy as np
+from numpy import pi
+from scipy.special import eval_legendre, roots_legendre, sph_harm_y
+from scipy.special import lpmv, spherical_in
+from sympy.functions.combinatorial.factorials import factorial
 
 from tests.script.configuration import Configuration
-from tests.script.numerical_utils import Y_lm_real_scipy
 from tests.script.utils_ext import cartesian_to_spherical, l_m_pairs
 
 # *********CONSTANTS USED*************************
@@ -243,7 +239,7 @@ def coefficient(r_ij, one_over_2_sigma_squared, n, l, m, r_cutoff,
     r_ij_norm = np.linalg.norm(r_ij)
     theta, phi = cartesian_to_spherical(*r_ij, r_ij_norm)
 
-    return (4*np.pi * Y_lm_real_scipy(l, m, theta, phi)
+    return (4*np.pi * sph_harm_y(l, m, theta, phi)
             * np.exp(-one_over_2_sigma_squared*r_ij_norm**2)
             * I_nl_ij_dvr(
                 n,
@@ -254,6 +250,7 @@ def coefficient(r_ij, one_over_2_sigma_squared, n, l, m, r_cutoff,
                 DVR_BASIS_NUM
                 )
             )
+
 
 def P_bar_l_m(l, m, theta):
     m = abs(m)

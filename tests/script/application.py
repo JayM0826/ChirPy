@@ -3,9 +3,7 @@ import time
 import chirpy as cp
 import numpy as np
 
-
-
-
+from collections import defaultdict
 
 import numerical_utils as num_utils
 import analytical_utils as ana_utils
@@ -106,24 +104,29 @@ class Application:
         pseudoscalar_keys = [
                   (2, 3, 4),
                   (3, 4, 6),
-                  (2, 5, 6)
+                  (2, 5, 6),
+                  # (3, 5, 7),
+                  # (4, 5, 6),
+                  # (4, 5, 8),
+                  # (4, 6, 7),
+                  # (5, 6, 8),
         ]
         frame_i = 0
-        from collections import defaultdict
+
+        sigmas = np.array([1.4, 1.0, 1.0, 1.4, 1.0, 1.0]) * 0.15
+        self.config.SIGMAS = sigmas
+
         bispectra_by_key = defaultdict(list)
-        for frame in system.data[:, 0:3]:
+        for frame in system.data[..., 0:3]:
             frame_i += 1
             # sigmas = utils_ext.get_sigmas(frame) * 0.25
-            sigmas = np.array([1.4, 1.0, 1.0,1.4,1.0,1.0]) * 0.15
-            self.config.SIGMAS = sigmas
+
             frame_within_cutoff = utils_ext.filter_atoms_within_cutoff(
                 frame,
                 self.config.ORIGIN_ATOM_INDEX,
                 self.config.CUT_OFF
             )
             coefficients = ana_utils.compute_coefficients_in_dict([frame_within_cutoff], self.config)
-            # utils_ext.print_format_nlm_coefficients(coefficients, self.config.N_MAX, self.config.L_MAX)
-            # plot_util.plot_coefficients(coefficients)
 
             # bispectrum = utils_ext.calculate_aggregated_bispectrum(coefficients)
             for pseudoscalar_key in pseudoscalar_keys:

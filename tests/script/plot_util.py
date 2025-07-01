@@ -194,17 +194,53 @@ def plot_two_bispectra(bispectrum1, bispectrum2, max_l=5):
 
 
 def plot_bispectra_path(keys_to_plot, bispectra_by_key, n_frames, title):
+    # frames = np.arange(1, n_frames + 1)  # base 1
+    # fig, axes = plt.subplots(1, 1, figsize=(10, 8), sharex=True)
+    #
+    # # for key in keys_to_plot:
+    # #     values = bispectra_by_key[key]
+    # #     values_real = [v.real for v in values]
+    # #     label = rf"$B_{{{key[0]}{key[1]}{key[2]}}}$"
+    # #     axes[0].plot(frames, values_real, marker='o', label=label)
+    # #
+    # # axes[0].hlines(0, 1, n_frames, colors='k', linestyles='--', linewidth=1)
+    # # axes[0].set_ylabel("Real Part")
+    # # axes[0].set_title("Real Part of Bispectrum")
+    # # axes[0].grid(True)
+    # # axes[0].legend()
+    #
+    #
+    #
+    # for key in keys_to_plot:
+    #     values = bispectra_by_key[key]  # 直接使用，无需取 .real
+    #     values_imag = [v.imag for v in values]
+    #     label = rf"$B_{{{key[0]}{key[1]}{key[2]}}}$"
+    #     axes[0].plot(frames, values_imag, marker='o', label=label)
+    #
+    # axes[0].hlines(0, 1, n_frames, colors='k', linestyles='--', linewidth=1)
+    # axes[0].set_ylabel("Imaginary Part")
+    # axes[0].set_xlabel("Frame Index")
+    # axes[0].set_title("Bispectrum")
+    # axes[0].grid(True)
+    # axes[0].legend()
+    #
+    # fig.suptitle(title, fontsize=16)
+    #
+    # fig.tight_layout(rect=[0, 0, 1, 0.95])
+    #
+    # plt.show()
+
+
     plt.figure(figsize=(10, 5))
     frames = np.arange(1, n_frames + 1)  # base 1
     for key in keys_to_plot:
-        values = bispectra_by_key[key]  # 直接使用，无需取 .real
+        values = bispectra_by_key[key]
+        values_imag = [v.imag for v in values]
         label = rf"$B_{{{key[0]}{key[1]}{key[2]}}}$"
-        plt.plot(frames, values, marker='o', label=label)
+        plt.plot(frames, values_imag, marker='o', label=label)
 
-    # ✅ 添加水平 0 线
-    plt.hlines(0, 0, n_frames - 1, colors='k', linestyles='--', linewidth=1)
+    plt.hlines(0, 1, n_frames, colors='k', linestyles='--', linewidth=1)
 
-    # ✅ 图形标签与样式
     plt.xlabel("Frame Index")
     plt.ylabel("Bispectrum Value")
     plt.title(title)
