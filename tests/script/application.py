@@ -137,7 +137,7 @@ class Application:
             print("\n\n\n")
 
 
-        plot_util.plot_bispectra_path(pseudoscalar_keys, bispectra_by_key, frame_i, "Bispectrum Evolution across achiral path")
+        plot_util.plot_bispectra_path(pseudoscalar_keys, bispectra_by_key, frame_i, "Bispectrum Evolution across chiral path")
         return coefficients
 
 if __name__ == '__main__':
@@ -145,7 +145,7 @@ if __name__ == '__main__':
     utils_ext.print_banner("Gauß  START")
     # app = Application("achiral_path.xyz")
 
-    app = Application("achiral_path.xyz")
+    app = Application("chiral_path.xyz")
     # coeff_numerical = app.run_numerically()
 
 

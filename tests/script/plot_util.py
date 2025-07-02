@@ -26,41 +26,6 @@ def plot_power_spectrum(power_spectrum, max_l=6):
     plt.show()
 
 
-def plot_power_spectrum_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
-    # Calculate aggregated power spectrum for both sets
-    power_before = utils_ext.calculate_aggregated_power_spectrum(coeffs_before, total_l)
-    power_after = utils_ext.calculate_aggregated_power_spectrum(coeffs_after, total_l)
-
-    # Prepare data for plotting, use only the first max_l + 1 l
-    l_values = list(range(max_l + 1))
-    powers_before = [power_before.get(l, 0) for l in l_values]
-    powers_after = [power_after.get(l, 0) for l in l_values]
-
-    # Set up subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
-
-    # Plot before rotation
-    x_positions = np.array(l_values) * 1.1
-    ax1.bar(x_positions, powers_before, 0.5, label='Power Spectrum')
-    ax1.set_xlabel('l')
-    ax1.set_ylabel('Aggregated Power Spectrum \( P_l \)')
-    ax1.set_title('Before Rotation')
-    ax1.set_xticks(x_positions)
-    ax1.set_xticklabels(l_values)
-    ax1.legend()
-
-    # Plot after rotation
-    ax2.bar(x_positions, powers_after, 0.5, label='Power Spectrum')
-    ax2.set_xlabel('l')
-    ax2.set_title('After Rotation')
-    ax2.set_xticks(x_positions)
-    ax2.set_xticklabels(l_values)
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.show()
-
-
 def plot_coefficients(coefficients, max_l=6, total_l=20):
     # Prepare data
     l_values = list(range(total_l + 1))  # Calculate all l from 0 to 20
@@ -239,12 +204,145 @@ def plot_bispectra_path(keys_to_plot, bispectra_by_key, n_frames, title):
         label = rf"$B_{{{key[0]}{key[1]}{key[2]}}}$"
         plt.plot(frames, values_imag, marker='o', label=label)
 
-    plt.hlines(0, 1, n_frames, colors='k', linestyles='--', linewidth=1)
+    plt.hlines(0, 1, n_frames, colors='k', linestyles='--', linewidth=3)
 
-    plt.xlabel("Frame Index")
-    plt.ylabel("Bispectrum Value")
-    plt.title(title)
+    plt.xlabel("Frame Index", fontsize=24)
+    plt.ylabel("Bispectrum Value", fontsize=24)
+    plt.title(title, fontsize=24)
+    # plt.tick_params("both", fontsize=20)
+    plt.tick_params(labelsize=20)
     plt.grid(True)
-    plt.legend()
+    plt.legend(fontsize=24)
     plt.tight_layout()
     plt.show()
+
+
+def plot_spherical_harmonics_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
+    # Prepare data for both sets
+    l_values = list(range(total_l + 1))  # Calculate all l from 0 to 20
+    m_values_by_l_before = {l: [] for l in l_values}
+    coeff_values_by_l_before = {l: [] for l in l_values}
+    m_values_by_l_after = {l: [] for l in l_values}
+    coeff_values_by_l_after = {l: [] for l in l_values}
+
+    # Aggregate coefficients by (l, m) for both sets
+    coeff_sum_before = {}
+    coeff_sum_after = {}
+    for (n, l, m), coeff in coeffs_before.items():
+        if l <= total_l:
+            key = (l, m)
+            if key not in coeff_sum_before:
+                coeff_sum_before[key] = 0
+            coeff_sum_before[key] += coeff
+
+    for (n, l, m), coeff in coeffs_after.items():
+        if l <= total_l:
+            key = (l, m)
+            if key not in coeff_sum_after:
+                coeff_sum_after[key] = 0
+            coeff_sum_after[key] += coeff
+
+    # Organize data for plotting, use only the first max_l + 1 l
+    for (l, m), coeff in coeff_sum_before.items():
+        if l <= max_l:
+            m_values_by_l_before[l].append(m)
+            coeff_values_by_l_before[l].append(coeff)
+
+    for (l, m), coeff in coeff_sum_after.items():
+        if l <= max_l:
+            m_values_by_l_after[l].append(m)
+            coeff_values_by_l_after[l].append(coeff)
+
+    # Set up subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+
+    # Plot before rotation
+    for i, l in enumerate(l_values[:max_l + 1]):
+        m_vals = np.array(m_values_by_l_before[l])
+        coeffs = np.array(coeff_values_by_l_before[l])
+        if len(m_vals) > 0:
+            x_positions = m_vals + (i * (2 * max_l + 1 + 0.1))
+            ax1.bar(x_positions, coeffs, 1.5, label=fr'$\ell$={l}')
+    ax1.set_xlabel('m', fontsize=20)
+    ax1.set_ylabel('Summed Coefficient Magnitude', fontsize=20)
+    ax1.set_title('Before Rotation', fontsize=20)
+    ax1.legend(fontsize=20)
+
+    # Plot after rotation
+    for i, l in enumerate(l_values[:max_l + 1]):
+        m_vals = np.array(m_values_by_l_after[l])
+        coeffs = np.array(coeff_values_by_l_after[l])
+        if len(m_vals) > 0:
+            x_positions = m_vals + (i * (2 * max_l + 1 + 0.1))
+            ax2.bar(x_positions, coeffs, 1.5, label=fr'$\ell$={l}')
+    ax2.set_xlabel('m', fontsize=20)
+    ax2.set_title('After Rotation', fontsize=20)
+    ax2.legend(fontsize=20)
+
+    # Adjust x-axis ticks for both plots
+    all_m_positions = []
+    all_m_labels = []
+    for i, l in enumerate(l_values[:max_l + 1]):
+        m_range = np.arange(-l, l + 1)
+        x_pos = m_range + (i * (2 * max_l + 1 + 0.1))
+        all_m_positions.extend(x_pos)
+        all_m_labels.extend([str(m) for m in m_range])
+
+    ax1.set_xticks(all_m_positions)
+    ax1.set_xticklabels(all_m_labels, rotation=45, fontsize=14)
+    ax2.set_xticks(all_m_positions)
+    ax2.set_xticklabels(all_m_labels, rotation=45, fontsize=14)
+
+    plt.tight_layout()
+    plt.show()
+
+def calculate_aggregated_power_spectrum(coefficients, max_l=20):
+    # Calculate aggregated power spectrum summing over m and n for each l
+    power_by_l = {}
+    for (n, l, m), coeff in coefficients.items():
+        if l <= max_l:
+            if l not in power_by_l:
+                power_by_l[l] = 0
+            power_by_l[l] += np.real(np.conjugate(coeff) * coeff)  # Sum over m and n
+    return power_by_l
+
+
+def plot_power_spectrum_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
+    # Calculate aggregated power spectrum for both sets
+    power_before = calculate_aggregated_power_spectrum(coeffs_before, total_l)
+    power_after = calculate_aggregated_power_spectrum(coeffs_after, total_l)
+
+    # Prepare data for plotting, use only the first max_l + 1 l
+    l_values = list(range(max_l + 1))
+    powers_before = [power_before.get(l, 0) for l in l_values]
+    powers_after = [power_after.get(l, 0) for l in l_values]
+
+    # Set up subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+
+    # Plot before rotation
+    x_positions = np.array(l_values) * 1.1
+    ax1.bar(x_positions, powers_before, 0.9, label='Power Spectrum')
+    ax1.set_xlabel(r'$\ell$', fontsize=20)
+    ax1.set_ylabel(r'Aggregated Power Spectrum $P_\ell$', fontsize=20)
+    ax1.set_title('Before Rotation', fontsize=20)
+    ax1.set_xticks(x_positions)
+    ax1.set_xticklabels(l_values, fontsize=20)
+    ax1.tick_params(axis='both', labelsize=20)
+    ax1.legend(fontsize=20)
+
+    # Plot after rotation
+    ax2.bar(x_positions, powers_after, 0.9, label='Power Spectrum')
+    ax2.set_xlabel(r'$\ell$', fontsize=20)
+    ax2.set_title('After Rotation', fontsize=20)
+    ax2.set_xticks(x_positions)
+    ax2.set_xticklabels(l_values, fontsize=20)
+    ax2.tick_params(axis='both', labelsize=20)
+    ax2.legend(fontsize=12)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+

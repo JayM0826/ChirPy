@@ -7,7 +7,7 @@ from scipy.special import lpmv, spherical_in
 from sympy.functions.combinatorial.factorials import factorial
 
 from tests.script.configuration import Configuration
-from tests.script.utils_ext import cartesian_to_spherical, l_m_pairs
+from tests.script.utils_ext import cartesian_to_spherical, l_m_pairs, Y_lm_real_scipy
 
 # *********CONSTANTS USED*************************
 SQRT_2=sqrt(2)
