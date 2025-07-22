@@ -1,20 +1,21 @@
 # built-in module
+import datetime
+import functools
 import math as math
-from copy import deepcopy
+import platform
+import time
+import warnings
 
 import chirpy
 import numpy as np
 import plotly.graph_objects as go
 import pyfiglet
-import pyfiglet
-import datetime
-import platform
-# import torch
-from colorama import Fore, Style, init
-import time
 from PIL import Image
-import warnings
-import functools
+# import torch
+from colorama import Fore, Style
+from scipy.special import sph_harm_y
+from sympy import S
+from sympy.physics.quantum.cg import CG
 
 
 def print_format_nlm_coefficients(coefficients, n_max, l_max):
@@ -406,41 +407,7 @@ def deprecated(reason):
     return decorator
 
 
-# def compute_power_spectrum(coefficients_in_dict, max_l=20):
-#     # comment out code is the Eq.26 in the paper on representation env
-#     # # === Compute SOAP power spectrum p_{nn'l} ===
-#     # p_nn_l = np.zeros((n_max + 1, n_max + 1, l_max + 1))
-#     #
-#     # for l in range(l_max + 1):
-#     #     for n in range(n_max + 1):
-#     #         for np_ in range(n_max + 1):
-#     #             total = 0.0
-#     #             for m in range(-l, l + 1):
-#     #                 # m_idx = m + l
-#     #                 total += np.conj(c_nlm.get((n, l, m), 0.0) * c_nlm.get((np_, l, m), 0.0) )
-#     #             p_nn_l[n, np_, l] = total  # real because it’s a scalar product
-#     # return p_nn_l
-#
-#     # Prepare data
-#     l_values = list(range(max_l + 1))  # Calculate all l from 0 to 20
-#     m_values_by_l = {l: [] for l in l_values}
-#     coeff_values_by_l = {l: [] for l in l_values}
-#
-#     # Extract and aggregate coefficients by summing over all n
-#     coeff_sum = {}  # Store the sum of coefficients for each (l, m)
-#     for (n, l, m), coeff in coefficients_in_dict.items():
-#         if l <= max_l:
-#             key = (l, m)
-#             if key not in coeff_sum:
-#                 coeff_sum[key] = 0
-#             coeff_sum[key] += coeff  # Accumulate coefficients for the same (l, m) across all n
-#     return coeff_sum
 
-
-import numpy as np
-from sympy.physics.quantum.cg import CG
-from sympy import S
-from itertools import product
 
 
 def clebsch_gordan(l1, l2, m1, m2, l, m):
@@ -448,49 +415,6 @@ def clebsch_gordan(l1, l2, m1, m2, l, m):
     return float(result) if result else 0.0
 
 
-# def compute_all_bispectra(cnlm_dict):
-#     """
-#     输入:
-#         cnlm_dict: dict[(n, l, m)] = float（实数）
-#     输出:
-#         bispectra_dict[(l, l1, l2)] = float
-#     """
-#
-#     # 提取所有 n、l 的值
-#     n_values = sorted(set(key[0] for key in cnlm_dict))
-#     l_values = sorted(set(key[1] for key in cnlm_dict))
-#
-#     bispectra_dict = {}
-#
-#     for l, l1, l2 in product(l_values, repeat=3):
-#         b_ll1l2_total = 0.0
-#
-#         for n in n_values:
-#             b_nll1l2 = 0.0
-#
-#             for m in range(-l, l + 1):
-#                 for m1 in range(-l1, l1 + 1):
-#                     for m2 in range(-l2, l2 + 1):
-#                         C = clebsch_gordan(l, l1, l2, m, m1, m2)
-#                         if C == 0.0:
-#                             continue
-#
-#                         key1 = (n, l, m)
-#                         key2 = (n, l1, m1)
-#                         key3 = (n, l2, m2)
-#
-#                         if key1 in cnlm_dict and key2 in cnlm_dict and key3 in cnlm_dict:
-#                             c1 = cnlm_dict[key1]
-#                             c2 = cnlm_dict[key2]
-#                             c3 = cnlm_dict[key3]
-#                             b_nll1l2 += c1 * C * c2 * c3
-#
-#             b_ll1l2_total += b_nll1l2
-#
-#         # 存储最终聚合后的 b_{l l1 l2}
-#         bispectra_dict[(l, l1, l2)] = b_ll1l2_total
-#
-#     return bispectra_dict
 
 def calculate_bispectrum(c_nlm: dict, l1: int, l2: int, l3: int,
                          sum_over_n=True):
@@ -595,7 +519,7 @@ def calculate_aggregated_power_spectrum(coefficients, max_l=20):
             power_by_l[l] += np.real(np.conjugate(coeff) * coeff)  # Sum over m and n
     return power_by_l
 
-from scipy.special import eval_legendre, roots_legendre, sph_harm_y
+
 
 
 def Y_lm_real_scipy(l, m, theta, phi):
@@ -661,20 +585,10 @@ def Y_lm_real_scipy(l, m, theta, phi):
     # return Y
 
 
-# def reconstruct_density(coeff_in_dict, dvr_basis_funcs, config, r_vals, theta_vals, phi_vals, current_n, current_l):
-#     result = np.zeros_like(r_vals)
-#     for n in range(current_n + 1):
-#         R_n = dvr_basis_funcs(n, r_vals, config.DVR_BASIS_NUM)
-#         for l in range(current_l + 1):
-#             for m in range(-l, l + 1):
-#                 c_nlm = coeff_in_dict[(n, l, m)]
-#                 Y_lm = Y_lm_real_scipy(l, m, theta_vals, phi_vals)
-#                 result += c_nlm * R_n * Y_lm
-#     return result
 
 
 def numerical_density_at_nlm(c_nlm, dvr_basis_fun, config, r_nodes, x_vals, theta_vals, phi_vals, n, l, m):
     R_n = dvr_basis_fun(n, x_vals, config.DVR_BASIS_NUM)
     R_n /= r_nodes[n] * np.sqrt(config.CUT_OFF / 2.)
-    Y_lm = Y_lm_real_scipy(l, m, theta_vals, phi_vals)
+    Y_lm = sph_harm_y(l, m, theta_vals, phi_vals)
     return c_nlm * R_n * Y_lm
