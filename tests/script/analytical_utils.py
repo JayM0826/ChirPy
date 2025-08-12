@@ -40,12 +40,12 @@ def phi_n(n, x):
 
 
 # Construct DVR basis function ψ_j(x)
-def dvr_basis_function(j, sample_points, LEGENDRE_ORDER_NUM):
+def dvr_basis_function(j, sample_points_plot, LEGENDRE_ORDER_NUM):
     """
-    here sample_points must be in [-1, 1]
+    here sample_points_plot must be in [-1, 1]
     """
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
-    return sum(phi_n(n, sample_points) * phi_n(n, root_x[j])
+    return sum(phi_n(n, sample_points_plot) * phi_n(n, root_x[j])
                for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 

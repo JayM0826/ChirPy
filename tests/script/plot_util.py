@@ -142,19 +142,20 @@ def plot_two_bispectra(bispectrum1, bispectrum2, max_l=5):
     for l in l_values:
         im1 = axes[l, 0].imshow(data1[l], cmap=cm.viridis, aspect='auto',
                                 extent=[-0.5, max_l + 0.5, -0.5, max_l + 0.5])
-        axes[l, 0].set_title(f'Bispectrum 1 — L = {l}')
+        axes[l, 0].set_title(f'Bispectrum before rotation — L = {l}')
         axes[l, 0].set_xlabel('L2')
         axes[l, 0].set_ylabel('L1')
         plt.colorbar(im1, ax=axes[l, 0])
 
         im2 = axes[l, 1].imshow(data2[l], cmap=cm.viridis, aspect='auto',
                                 extent=[-0.5, max_l + 0.5, -0.5, max_l + 0.5])
-        axes[l, 1].set_title(f'Bispectrum 2 — L = {l}')
+        axes[l, 1].set_title(f'Bispectrum after rotation — L = {l}')
         axes[l, 1].set_xlabel('L2')
         axes[l, 1].set_ylabel('L1')
         plt.colorbar(im2, ax=axes[l, 1])
 
-    plt.tight_layout()
+    fig.suptitle("Bispectrum comparison", fontsize=20)
+    plt.tight_layout(rect=[0, 0, 1, 0.985])  # leave space for title
     plt.show()
 
 
@@ -217,84 +218,74 @@ def plot_bispectra_path(keys_to_plot, bispectra_by_key, n_frames, title):
     plt.show()
 
 
-def plot_spherical_harmonics_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
-    # Prepare data for both sets
-    l_values = list(range(total_l + 1))  # Calculate all l from 0 to 20
-    m_values_by_l_before = {l: [] for l in l_values}
-    coeff_values_by_l_before = {l: [] for l in l_values}
-    m_values_by_l_after = {l: [] for l in l_values}
-    coeff_values_by_l_after = {l: [] for l in l_values}
+import matplotlib.pyplot as plt
+import numpy as np
 
-    # Aggregate coefficients by (l, m) for both sets
+def plot_spherical_harmonics_comparison(coeffs_before, coeffs_after, max_l=5, total_l=20):
+    # Prepare storage
+    l_values = list(range(total_l + 1))
     coeff_sum_before = {}
     coeff_sum_after = {}
+
+    # Aggregate (l, m) coefficients
     for (n, l, m), coeff in coeffs_before.items():
         if l <= total_l:
-            key = (l, m)
-            if key not in coeff_sum_before:
-                coeff_sum_before[key] = 0
-            coeff_sum_before[key] += coeff
+            coeff_sum_before[(l, m)] = coeff_sum_before.get((l, m), 0) + coeff
 
     for (n, l, m), coeff in coeffs_after.items():
         if l <= total_l:
-            key = (l, m)
-            if key not in coeff_sum_after:
-                coeff_sum_after[key] = 0
-            coeff_sum_after[key] += coeff
+            coeff_sum_after[(l, m)] = coeff_sum_after.get((l, m), 0) + coeff
 
-    # Organize data for plotting, use only the first max_l + 1 l
-    for (l, m), coeff in coeff_sum_before.items():
-        if l <= max_l:
-            m_values_by_l_before[l].append(m)
-            coeff_values_by_l_before[l].append(coeff)
+    # Set up plot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7), sharey=True)
 
-    for (l, m), coeff in coeff_sum_after.items():
-        if l <= max_l:
-            m_values_by_l_after[l].append(m)
-            coeff_values_by_l_after[l].append(coeff)
+    # Plot settings
+    group_gap = 3.0  # gap between l blocks
+    bar_width = 1.2
+    xticks = []
+    xticklabels = []
 
-    # Set up subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6), sharey=True)
+    position_cursor = 0
 
-    # Plot before rotation
-    for i, l in enumerate(l_values[:max_l + 1]):
-        m_vals = np.array(m_values_by_l_before[l])
-        coeffs = np.array(coeff_values_by_l_before[l])
-        if len(m_vals) > 0:
-            x_positions = m_vals + (i * (2 * max_l + 1 + 0.1))
-            ax1.bar(x_positions, coeffs, 1.5, label=fr'$\ell$={l}')
-    ax1.set_xlabel('m', fontsize=20)
-    ax1.set_ylabel('Summed Coefficient Magnitude', fontsize=20)
-    ax1.set_title('Before Rotation', fontsize=20)
-    ax1.legend(fontsize=20)
-
-    # Plot after rotation
-    for i, l in enumerate(l_values[:max_l + 1]):
-        m_vals = np.array(m_values_by_l_after[l])
-        coeffs = np.array(coeff_values_by_l_after[l])
-        if len(m_vals) > 0:
-            x_positions = m_vals + (i * (2 * max_l + 1 + 0.1))
-            ax2.bar(x_positions, coeffs, 1.5, label=fr'$\ell$={l}')
-    ax2.set_xlabel('m', fontsize=20)
-    ax2.set_title('After Rotation', fontsize=20)
-    ax2.legend(fontsize=20)
-
-    # Adjust x-axis ticks for both plots
-    all_m_positions = []
-    all_m_labels = []
-    for i, l in enumerate(l_values[:max_l + 1]):
+    for l in range(max_l + 1):
         m_range = np.arange(-l, l + 1)
-        x_pos = m_range + (i * (2 * max_l + 1 + 0.1))
-        all_m_positions.extend(x_pos)
-        all_m_labels.extend([str(m) for m in m_range])
+        num_m = len(m_range)
 
-    ax1.set_xticks(all_m_positions)
-    ax1.set_xticklabels(all_m_labels, rotation=45, fontsize=14)
-    ax2.set_xticks(all_m_positions)
-    ax2.set_xticklabels(all_m_labels, rotation=45, fontsize=14)
+        # Compute positions for each m in this l block
+        x_positions = position_cursor + np.arange(num_m)
+        position_cursor = x_positions[-1] + group_gap
+
+        # Collect labels
+        xticks.extend(x_positions)
+        xticklabels.extend([str(m) for m in m_range])
+        # Get coefficients
+        coeffs_before_vals = [coeff_sum_before.get((l, m), 0) for m in m_range]
+        coeffs_after_vals = [coeff_sum_after.get((l, m), 0) for m in m_range]
+
+        # Plot bars
+        ax1.bar(x_positions, coeffs_before_vals, width=bar_width, label=fr'$\ell$={l}')
+        ax2.bar(x_positions, coeffs_after_vals, width=bar_width, label=fr'$\ell$={l}')
+
+    # Styling for ax1
+    ax1.set_title("Before Rotation", fontsize=22)
+    ax1.set_xlabel("m", fontsize=30)
+    ax1.set_ylabel("Summed Coefficient Magnitude", fontsize=20)
+    ax1.set_xticks(xticks)
+    ax1.set_xticklabels(xticklabels, rotation=45, ha='center', fontsize=18)
+    ax1.tick_params(axis='y', labelsize=20)
+    ax1.grid(True, axis='y', linestyle='--', alpha=0.4)
+
+    # Styling for ax2
+    ax2.set_title("After Rotation", fontsize=22)
+    ax2.set_xlabel("m", fontsize=30)
+    ax2.set_xticks(xticks)
+    ax2.set_xticklabels(xticklabels, rotation=45, ha='center', fontsize=18)
+    ax2.tick_params(axis='y', labelsize=20)
+    ax2.grid(True, axis='y', linestyle='--', alpha=0.4)
 
     plt.tight_layout()
     plt.show()
+
 
 def calculate_aggregated_power_spectrum(coefficients, max_l=20):
     # Calculate aggregated power spectrum summing over m and n for each l

@@ -34,9 +34,13 @@ def phi_n(n, x):
     return norm * eval_legendre(n, x) * np.sqrt(weight_func)
 
 # Construct DVR basis function ψ_j(x)
-def dvr_basis_function(j, grid_x, LEGENDRE_ORDER_NUM):
+def dvr_basis_function(j, sample_points_plot, LEGENDRE_ORDER_NUM):
+    """
+    here sample_points_plot must be in [-1, 1]
+    """
     root_x, weight_x = roots_legendre(LEGENDRE_ORDER_NUM)
-    return sum(phi_n(n, root_x[j]) * phi_n(n, grid_x) for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
+    return sum(phi_n(n, sample_points_plot) * phi_n(n, root_x[j])
+               for n in range(LEGENDRE_ORDER_NUM)) * np.sqrt(weight_x[j])
 
 
 def project_density_to_basis(density_fun, real_spherical_harmonics, config, n):

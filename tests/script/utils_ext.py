@@ -159,19 +159,19 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
         x_upper, y_upper, z_upper = cutoff, cutoff, cutoff,
         x_lower, y_lower, z_lower = - cutoff, - cutoff, - cutoff
         return (x_lower, x_upper, y_lower, y_upper, z_lower, z_upper)
-    #        return tuple(int(math.ceil(x)) for x in (
-    #                                                 x_lower,
-    #                                                 x_upper,
-    #                                                 y_lower,
-    #                                                 y_upper,
-    #                                                 z_lower,
-    #                                                 z_upper
-    #                                                 ))
-    #
+#        return tuple(int(math.ceil(x)) for x in (
+#                                                 x_lower,
+#                                                 x_upper,
+#                                                 y_lower,
+#                                                 y_upper,
+#                                                 z_lower,
+#                                                 z_upper
+#                                                 ))
+#
     # otherwise
     atom_3D_relative_positions = atom_3D_positions - atom_3D_positions[
-        origin_atom_index
-    ]
+            origin_atom_index
+            ]
 
     max_values = np.max((atom_3D_relative_positions), axis=0)
     min_values = np.min((atom_3D_relative_positions), axis=0)
@@ -182,13 +182,13 @@ def coupute_XYZ_bounds(atom_3D_positions, sigmas, cutoff, origin_atom_index):
     # easy to use linspace with int
 
     return tuple(int(math.ceil(x)) for x in (
-        x_lower,
-        x_upper,
-        y_lower,
-        y_upper,
-        z_lower,
-        z_upper
-    ))
+                                             x_lower,
+                                             x_upper,
+                                             y_lower,
+                                             y_upper,
+                                             z_lower,
+                                             z_upper
+                                             ))
 
 
 def filter_atoms_within_cutoff(positions, origin_atom_index, cutoff):
